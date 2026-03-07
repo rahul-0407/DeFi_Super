@@ -1,0 +1,84 @@
+# ─────────────────────────────────────────────────────
+# DeFi Super — Subgraph Schema
+# ─────────────────────────────────────────────────────
+
+# ──────── AMM / DEX ────────
+
+type Pool @entity {
+  id: ID! # Pool contract address
+  token0: Bytes!
+  token1: Bytes!
+  reserve0: BigInt!
+  reserve1: BigInt!
+  totalSupply: BigInt!
+  swapCount: BigInt!
+  totalVolume0: BigDecimal!
+  totalVolume1: BigDecimal!
+  createdAt: BigInt!
+  swaps: [Swap!]! @derivedFrom(field: "pool")
+  positions: [LiquidityPosition!]! @derivedFrom(field: "pool")
+}
+
+type Swap @entity {
+  id: ID! # tx hash + log index
+  pool: Pool!
+  sender: Bytes!
+  to: Bytes!
+  amount0In: BigInt!
+  amount1In: BigInt!
+  amount0Out: BigInt!
+  amount1Out: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type LiquidityPosition @entity {
+  id: ID! # pool address + user address
+  pool: Pool!
+  user: Bytes!
+  liquidity: BigInt! # LP token balance
+  amount0Deposited: BigInt!
+  amount1Deposited: BigInt!
+}
+
+# ──────── Lending ────────
+
+type Loan @entity {
+  id: ID! # user address
+  user: Bytes!
+  collateralAmount: BigInt!
+  borrowAmount: BigInt!
+  lastUpdated: BigInt!
+}
+
+type LiquidationEvent @entity {
+  id: ID! # tx hash + log index
+  liquidator: Bytes!
+  user: Bytes!
+  debtRepaid: BigInt!
+  collateralSeized: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+# ──────── Staking ────────
+
+type StakePosition @entity {
+  id: ID! # user address
+  user: Bytes!
+  stakedAmount: BigInt!
+  totalRewardsClaimed: BigInt!
+  lastUpdated: BigInt!
+}
+
+# ──────── Flash Loans ────────
+
+type FlashLoanEvent @entity {
+  id: ID! # tx hash + log index
+  borrower: Bytes!
+  token: Bytes!
+  amount: BigInt!
+  fee: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}

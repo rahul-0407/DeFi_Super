@@ -1,0 +1,17 @@
+{
+  "name": "defi-super-subgraph",
+  "version": "1.0.0",
+  "description": "Subgraph for the DeFi Super protocol",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph build",
+    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ defi-super",
+    "create-local": "graph create --node http://localhost:8020/ defi-super",
+    "remove-local": "graph remove --node http://localhost:8020/ defi-super",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 defi-super"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "^0.60.0",
+    "@graphprotocol/graph-ts": "^0.31.0"
+  }
+}
