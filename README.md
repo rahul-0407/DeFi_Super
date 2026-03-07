@@ -1,0 +1,326 @@
+# 🏦 DeFi Super — Production-Grade DeFi Protocol
+
+A modular, gas-optimized DeFi protocol built with Foundry & Solidity. Features an AMM/DEX with LP tokens, over-collateralized lending, staking rewards, flash loans, and full subgraph indexing.
+
+---
+
+## 🏗 Protocol Architecture
+
+### System Layers
+
+This diagram illustrates the high-level architecture of the DeFi Super App, showing the flow from the user interface through the smart contract logic to the indexing and analytics layer.
+
+```mermaid
+graph TB
+    User((User))
+
+    subgraph FrontendLayer ["Frontend Layer (Next.js)"]
+        Dashboard[Dashboard UI]
+        Connect[Wagmi / RainbowKit]
+        AnalyticsUI[Analytics Dashboard]
+    end
+
+    subgraph InterfaceLayer ["Interface Layer"]
+        Router[DeFiRouter]
+    end
+
+    subgraph LogicLayer ["Smart Contract Modules"]
+        AMM[DeFiAMM<br/>DEX Module]
+        LEND[DeFiLend<br/>Lending Module]
+        STAKE[DeFiStaking<br/>Staking Module]
+        FLASH[DeFiFlashLoan<br/>Flash Loan Module]
+        ORACLE[(Chainlink<br/>Oracles)]
+    end
+
+    subgraph DataLayer ["Data & Indexing Layer"]
+        Events{Blockchain Events}
+        Subgraph[Subgraph Indexer]
+    end
+
+    User --> Dashboard
+    Dashboard --> Connect
+    Connect --> Router
+
+    Router --> AMM
+    Router --> LEND
+    Router --> STAKE
+    Router --> FLASH
+
+    ORACLE -.-> LEND
+
+    AMM & LEND & STAKE & FLASH --> Events
+    Events --> Subgraph
+    Subgraph --> AnalyticsUI
+```
+
+### Smart Contract Interaction Flow
+
+The following sequence describes how a user transaction (e.g., a swap or a deposit) is processed, indexed, and eventually reflected in the analytics suite.
+
+```mermaid
+sequenceDiagram
+    participant U as User Wallet
+    participant F as Frontend (wagmi/viem)
+    participant R as DeFiRouter
+    participant M as Protocol Modules
+    participant B as Blockchain Events
+    participant S as Subgraph Indexer
+    participant A as Analytics Dashboard
+
+    U->>F: Initiate Transaction
+    F->>R: Execute Call (e.g. swap/deposit)
+    R->>M: Route to AMM / Lend / Stake
+    M->>M: Execute Logic & State Change
+    M-->>B: Emit Enriched Event (e.g. PositionUpdated)
+    B-->>S: Index Log Data
+    S-->>A: Provide Aggregated Stats (TVL/Volume/Fees)
+    A->>F: Update Analytics UI
+```
+
+---
+
+## 📦 Smart Contracts
+
+### DeFiAMM — Constant Product AMM
+
+**`src/DeFiAMM.sol`**
+
+| Feature       | Detail                                                  |
+| ------------- | ------------------------------------------------------- |
+| Pricing       | `x * y = k` constant product formula                    |
+| LP Tokens     | Inline ERC20 (name: "DeFi LP Token", symbol: "DLP")     |
+| Swap Fee      | 0.3% — accrues to LP holders via k-value growth         |
+| Min Liquidity | First 1000 LP tokens permanently locked to `address(1)` |
+| Security      | `nonReentrant`, `whenNotPaused`, `SafeERC20`            |
+
+**Key Functions:**
+
+- `addLiquidity(amount0, amount1)` → mints LP tokens
+- `removeLiquidity(shares)` → burns LP tokens, returns proportional assets
+- `swap(amount0Out, amount1Out, to)` → swaps with k-invariant check
+
+---
+
+### DeFiLend — Lending Protocol
+
+**`src/DeFiLend.sol`**
+
+| Feature           | Detail                                               |
+| ----------------- | ---------------------------------------------------- |
+| Model             | Over-collateralized lending                          |
+| **Pricing**       | **Chainlink Oracle Integration (AggregatorV3)**      |
+| Threshold         | 80% LTV (Loan-to-Value)                              |
+| Liquidation Bonus | 5% — incentivizes liquidators                        |
+| Struct Packing    | `uint128` collateral + borrow in single storage slot |
+| Security          | Staleness checks (1h max), ReentrancyGuard, Pausable |
+
+**Key Functions:**
+
+- `deposit(amount)` — deposit collateral (emits `PositionUpdated`)
+- `borrow(amount)` — borrow against collateral (emits `PositionUpdated`)
+- `repay(amount)` — repay debt (emits `PositionUpdated`)
+- `liquidate(user, amount)` — execute liquidation via oracle prices (emits `LiquidationExecuted`)
+
+---
+
+### DeFiStaking — Reward Distribution
+
+**`src/DeFiStaking.sol`**
+
+| Feature      | Detail                                       |
+| ------------ | -------------------------------------------- |
+| Model        | Reward-per-token cumulative distribution     |
+| Default Rate | 1 token/second                               |
+| Admin        | Owner can adjust `rewardRate`                |
+| Security     | `nonReentrant`, `whenNotPaused`, `SafeERC20` |
+
+**Key Functions:**
+
+- `stake(amount)` — stake tokens to earn rewards
+- `withdraw(amount)` — withdraw staked tokens
+- `getReward()` — claim accumulated rewards
+
+---
+
+### DeFiFlashLoan — Flash Loan Provider
+
+**`src/DeFiFlashLoan.sol`**
+
+| Feature         | Detail                                      |
+| --------------- | ------------------------------------------- |
+| Pattern         | EIP-3156 compatible                         |
+| Fee             | 0.09% (9 basis points)                      |
+| Callback        | `IFlashBorrower.onFlashLoan()`              |
+| Token Whitelist | Owner configures supported tokens           |
+| **Events**      | Enriched `FlashLoanExecuted` with initiator |
+
+**Key Functions:**
+
+- `flashLoan(receiver, token, amount, data)` — execute loan
+- `flashFee(amount)` — calculate fee
+- `maxFlashLoan(token)` — available liquidity
+
+---
+
+### DeFiRouter — User-Facing Router
+
+**`src/DeFiRouter.sol`**
+
+- Handles token approvals and transfers for AMM operations
+- Deadline parameter for front-running protection
+- Slippage protection on swaps (`amountOutMin`)
+
+---
+
+## 🔒 Security Patterns
+
+All contracts implement:
+
+| Pattern             | Purpose                                                     |
+| ------------------- | ----------------------------------------------------------- |
+| **ReentrancyGuard** | Prevents reentrancy attacks on all state-changing functions |
+| **Ownable**         | Admin access control for pause/unpause and configuration    |
+| **Pausable**        | Emergency circuit breaker — owner can halt all operations   |
+| **SafeERC20**       | Safe token transfers with return value checking             |
+| **Custom Errors**   | Gas-efficient error handling (vs revert strings)            |
+| **Deadline**        | Front-running protection on Router operations               |
+
+---
+
+## ⛽ Gas Optimizations
+
+| Technique                  | Applied In                                                |
+| -------------------------- | --------------------------------------------------------- |
+| `immutable` variables      | Token addresses across all contracts                      |
+| Struct packing (`uint128`) | `DeFiLend.UserAccount` — single storage slot              |
+| Storage caching            | Local variables for `reserve0`, `reserve1`, `totalSupply` |
+| Custom errors              | All contracts — saves ~200 gas vs revert strings          |
+| `unchecked` arithmetic     | Liquidation bonus calculation, fee tracking               |
+| `forceApprove`             | Router — avoids approval race conditions                  |
+
+---
+
+## 📊 Subgraph Indexing
+
+The `subgraph/` directory contains a complete [The Graph](https://thegraph.com/) indexer.
+
+### Enriched Events
+
+The protocol emits detailed events designed for high-fidelity indexing and the Analytics Dashboard.
+
+| Event                 | Purpose                                                                                         |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `PositionUpdated`     | Tracks every lending deposit, withdraw, borrow, and repay with post-action balances.            |
+| `LiquidationExecuted` | Details on user, liquidator, debt repaid, collateral seized, and pre-liquidation health factor. |
+| `FlashLoanExecuted`   | Logs the borrower, token, amount, fee, and the transaction initiator.                           |
+| `Swap`                | Native AMM swap data including input/output amounts.                                            |
+
+### Indexing Setup
+
+```bash
+cd subgraph
+npm install
+npm run codegen
+npm run build
+npm run deploy
+```
+
+---
+
+## 🚀 Deployment
+
+### Prerequisites
+
+- [Foundry](https://book.getfoundry.sh/) installed
+- RPC endpoint (Alchemy, Infura, etc.)
+- Deployer private key with ETH for gas
+
+### Build & Test
+
+```bash
+cd contracts
+
+# Build
+forge build
+
+# Run tests
+forge test -vvv
+
+# Gas report
+forge test --gas-report
+```
+
+### Deploy
+
+```bash
+# Set environment variables
+export TOKEN0_ADDRESS=0x...
+export TOKEN1_ADDRESS=0x...
+export COLLATERAL_TOKEN=0x...
+export BORROW_TOKEN=0x...
+export STAKING_TOKEN=0x...
+export REWARD_TOKEN=0x...
+
+# Deploy to network
+forge script script/Deploy.s.sol:Deploy \
+  --rpc-url $RPC_URL \
+  --private-key $DEPLOYER_KEY \
+  --broadcast \
+  --verify \
+  --etherscan-api-key $ETHERSCAN_KEY
+```
+
+---
+
+## 🧪 Test Suite
+
+**38 tests across 5 suites — all passing ✅**
+
+| Suite             | Tests | Coverage                                                   |
+| ----------------- | ----- | ---------------------------------------------------------- |
+| DeFiAMM           | 7     | Add/remove liquidity, swap, min liquidity, pause, deadline |
+| DeFiLend          | 12    | Oracle health checks, stale prices, liquidation, events    |
+| DeFiStaking       | 6     | Stake, withdraw, rewards, multi-staker                     |
+| DeFiFlashLoan     | 11    | Success, bad repay, bad callback, fees, events, access     |
+| Counter & Default | 2     | Foundry default                                            |
+
+---
+
+## 📁 Project Structure
+
+```
+DeFi_Super/
+├── contracts/                # Foundry project
+│   ├── src/
+│   │   ├── DeFiAMM.sol       # AMM with LP tokens
+│   │   ├── DeFiLend.sol      # Lending protocol
+│   │   ├── DeFiStaking.sol   # Staking rewards
+│   │   ├── DeFiFlashLoan.sol # Flash loans
+│   │   ├── DeFiRouter.sol    # User router
+│   │   └── IFlashBorrower.sol# Flash loan interface
+│   ├── test/                 # Forge test suite
+│   ├── script/               # Deployment scripts
+│   └── lib/                  # Dependencies (forge-std, OZ)
+├── subgraph/                 # The Graph indexer
+│   ├── schema.graphql
+│   ├── subgraph.yaml
+│   └── src/                  # Event handlers
+└── frontend/                 # Next.js dashboard
+```
+
+---
+
+## 🛠 Tech Stack
+
+- **Smart Contracts**: Solidity 0.8.20+, Foundry
+- **Security**: OpenZeppelin Contracts v5.6.1
+- **Testing**: Forge Test (with fuzz testing)
+- **Indexing**: The Graph Protocol
+- **Frontend**: Next.js, wagmi, RainbowKit, viem
+- **Styling**: Tailwind CSS, Framer Motion
+
+---
+
+## 📄 License
+
+MIT

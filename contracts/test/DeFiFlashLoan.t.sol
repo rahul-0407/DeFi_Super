@@ -66,6 +66,15 @@ contract DeFiFlashLoanTest is Test {
 
         uint256 poolBalanceBefore = token.balanceOf(address(flashLoan));
 
+        vm.expectEmit(true, true, true, false);
+        emit DeFiFlashLoan.FlashLoanExecuted(
+            address(this),
+            address(borrower),
+            address(token),
+            loanAmount,
+            expectedFee,
+            block.timestamp
+        );
         flashLoan.flashLoan(borrower, address(token), loanAmount, "");
 
         uint256 poolBalanceAfter = token.balanceOf(address(flashLoan));

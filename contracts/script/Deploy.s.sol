@@ -25,6 +25,8 @@ import {DeFiFlashLoan} from "../src/DeFiFlashLoan.sol";
  *   TOKEN1_ADDRESS - Address of token1 for AMM pair
  *   COLLATERAL_TOKEN - Address of collateral token for lending
  *   BORROW_TOKEN     - Address of borrow token for lending
+ *   COLLATERAL_PRICE_FEED - Chainlink price feed for collateral token
+ *   BORROW_PRICE_FEED     - Chainlink price feed for borrow token
  *   STAKING_TOKEN    - Address of staking token
  *   REWARD_TOKEN     - Address of reward token
  */
@@ -34,6 +36,8 @@ contract Deploy is Script {
         address token1 = vm.envAddress("TOKEN1_ADDRESS");
         address collateralToken = vm.envAddress("COLLATERAL_TOKEN");
         address borrowToken = vm.envAddress("BORROW_TOKEN");
+        address collateralPriceFeed = vm.envAddress("COLLATERAL_PRICE_FEED");
+        address borrowPriceFeed = vm.envAddress("BORROW_PRICE_FEED");
         address stakingToken = vm.envAddress("STAKING_TOKEN");
         address rewardToken = vm.envAddress("REWARD_TOKEN");
 
@@ -47,8 +51,13 @@ contract Deploy is Script {
         DeFiRouter router = new DeFiRouter();
         console.log("DeFiRouter deployed at:", address(router));
 
-        // 3. Deploy Lending Protocol
-        DeFiLend lend = new DeFiLend(collateralToken, borrowToken);
+        // 3. Deploy Lending Protocol (with Chainlink oracle feeds)
+        DeFiLend lend = new DeFiLend(
+            collateralToken,
+            borrowToken,
+            collateralPriceFeed,
+            borrowPriceFeed
+        );
         console.log("DeFiLend deployed at:", address(lend));
 
         // 4. Deploy Staking

@@ -55,8 +55,23 @@ type LiquidationEvent @entity {
   id: ID! # tx hash + log index
   liquidator: Bytes!
   user: Bytes!
+  collateralAsset: Bytes!
+  borrowAsset: Bytes!
   debtRepaid: BigInt!
   collateralSeized: BigInt!
+  healthFactorBefore: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type PositionUpdate @entity {
+  id: ID! # tx hash + log index
+  user: Bytes!
+  asset: Bytes!
+  action: String!
+  amount: BigInt!
+  newCollateral: BigInt!
+  newBorrow: BigInt!
   timestamp: BigInt!
   blockNumber: BigInt!
 }
@@ -75,6 +90,7 @@ type StakePosition @entity {
 
 type FlashLoanEvent @entity {
   id: ID! # tx hash + log index
+  initiator: Bytes!
   borrower: Bytes!
   token: Bytes!
   amount: BigInt!

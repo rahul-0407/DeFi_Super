@@ -1,12 +1,13 @@
 import { BigInt } from "@graphprotocol/graph-ts";
 import {
-    Deposit as DepositEvent,
-    Withdraw as WithdrawEvent,
-    Borrow as BorrowEvent,
-    Repay as RepayEvent,
-    Liquidate as LiquidateEvent,
+    PositionUpdated as PositionUpdatedEvent,
+    LiquidationExecuted as LiquidationExecutedEvent,
 } from "../../contracts/out/DeFiLend.sol/DeFiLend";
-import { Loan, LiquidationEvent } from "../generated/schema";
+import {
+    Loan,
+    LiquidationEvent,
+    PositionUpdate,
+} from "../generated/schema";
 
 function getOrCreateLoan(userAddress: string): Loan {
     let loan = Loan.load(userAddress);
@@ -20,43 +21,40 @@ function getOrCreateLoan(userAddress: string): Loan {
     return loan;
 }
 
-export function handleDeposit(event: DepositEvent): void {
+export function handlePositionUpdated(event: PositionUpdatedEvent): void {
+    // Update the user's loan state
     let loan = getOrCreateLoan(event.params.user.toHex());
     loan.user = event.params.user;
-    loan.collateralAmount = loan.collateralAmount.plus(event.params.amount);
-    loan.lastUpdated = event.block.timestamp;
+    loan.collateralAmount = BigInt.fromI64(event.params.newCollateral.toI64());
+    loan.borrowAmount = BigInt.fromI64(event.params.newBorrow.toI64());
+    loan.lastUpdated = event.params.timestamp;
     loan.save();
+
+    // Create position update record
+    let update = new PositionUpdate(
+        event.transaction.hash.toHex() + "-" + event.logIndex.toString()
+    );
+    update.user = event.params.user;
+    update.asset = event.params.asset;
+    update.action = event.params.action;
+    update.amount = event.params.amount;
+    update.newCollateral = BigInt.fromI64(event.params.newCollateral.toI64());
+    update.newBorrow = BigInt.fromI64(event.params.newBorrow.toI64());
+    update.timestamp = event.params.timestamp;
+    update.blockNumber = event.block.number;
+    update.save();
 }
 
-export function handleWithdraw(event: WithdrawEvent): void {
-    let loan = getOrCreateLoan(event.params.user.toHex());
-    loan.collateralAmount = loan.collateralAmount.minus(event.params.amount);
-    loan.lastUpdated = event.block.timestamp;
-    loan.save();
-}
-
-export function handleBorrow(event: BorrowEvent): void {
-    let loan = getOrCreateLoan(event.params.user.toHex());
-    loan.borrowAmount = loan.borrowAmount.plus(event.params.amount);
-    loan.lastUpdated = event.block.timestamp;
-    loan.save();
-}
-
-export function handleRepay(event: RepayEvent): void {
-    let loan = getOrCreateLoan(event.params.user.toHex());
-    loan.borrowAmount = loan.borrowAmount.minus(event.params.amount);
-    loan.lastUpdated = event.block.timestamp;
-    loan.save();
-}
-
-export function handleLiquidate(event: LiquidateEvent): void {
-    // Update the borrower's loan
+export function handleLiquidationExecuted(
+    event: LiquidationExecutedEvent
+): void {
+    // Update the borrower's loan from position
     let loan = getOrCreateLoan(event.params.user.toHex());
     loan.borrowAmount = loan.borrowAmount.minus(event.params.debtRepaid);
     loan.collateralAmount = loan.collateralAmount.minus(
         event.params.collateralSeized
     );
-    loan.lastUpdated = event.block.timestamp;
+    loan.lastUpdated = event.params.timestamp;
     loan.save();
 
     // Create liquidation event record
@@ -65,9 +63,12 @@ export function handleLiquidate(event: LiquidateEvent): void {
     );
     liquidation.liquidator = event.params.liquidator;
     liquidation.user = event.params.user;
+    liquidation.collateralAsset = event.params.collateralAsset;
+    liquidation.borrowAsset = event.params.borrowAsset;
     liquidation.debtRepaid = event.params.debtRepaid;
     liquidation.collateralSeized = event.params.collateralSeized;
-    liquidation.timestamp = event.block.timestamp;
+    liquidation.healthFactorBefore = event.params.healthFactorBefore;
+    liquidation.timestamp = event.params.timestamp;
     liquidation.blockNumber = event.block.number;
     liquidation.save();
 }

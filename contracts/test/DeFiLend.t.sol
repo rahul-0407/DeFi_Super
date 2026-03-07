@@ -1,24 +1,38 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {DeFiLend} from "../src/DeFiLend.sol";
 import {MockERC20} from "./MockERC20.sol";
+import {MockV3Aggregator} from "./MockV3Aggregator.sol";
 
 contract DeFiLendTest is Test {
     DeFiLend lending;
     MockERC20 collateralToken;
     MockERC20 borrowToken;
+    MockV3Aggregator collateralFeed;
+    MockV3Aggregator borrowFeed;
     address user = address(1);
     address liquidator = address(2);
 
     function setUp() public {
         collateralToken = new MockERC20("Collateral", "COL");
         borrowToken = new MockERC20("Borrow", "BOR");
-        lending = new DeFiLend(address(collateralToken), address(borrowToken));
+
+        // COL = $2000 (8 decimals like Chainlink ETH/USD)
+        collateralFeed = new MockV3Aggregator(8, 2000e8);
+        // BOR = $1 (8 decimals like Chainlink USDC/USD)
+        borrowFeed = new MockV3Aggregator(8, 1e8);
+
+        lending = new DeFiLend(
+            address(collateralToken),
+            address(borrowToken),
+            address(collateralFeed),
+            address(borrowFeed)
+        );
 
         collateralToken.mint(user, 1000e18);
-        borrowToken.mint(address(lending), 1000e18);
+        borrowToken.mint(address(lending), 10_000_000e18);
 
         vm.prank(user);
         collateralToken.approve(address(lending), type(uint256).max);
@@ -26,92 +40,89 @@ contract DeFiLendTest is Test {
 
     function testDepositAndBorrow() public {
         vm.startPrank(user);
-        lending.deposit(100e18);
-        lending.borrow(50e18);
+        // Deposit 1 COL ($2000 collateral value)
+        lending.deposit(1e18);
+        // Max borrow = 2000 * 0.8 = $1600 worth of BOR at $1 each = 1600 BOR
+        lending.borrow(1000e18); // borrow $1000 worth — well within limit
         vm.stopPrank();
 
-        assertEq(lending.getHealthFactor(user), 160e16); // 1.6 * 1e18
-        assertEq(borrowToken.balanceOf(user), 50e18);
+        // Health factor = (1 * 2000 * 80) / (1000 * 1 * 100) = 1.6
+        assertEq(lending.getHealthFactor(user), 16e17);
+        assertEq(borrowToken.balanceOf(user), 1000e18);
     }
 
     function testBorrowOverLimitReverts() public {
         vm.startPrank(user);
-        lending.deposit(100e18);
+        lending.deposit(1e18); // $2000 collateral → max $1600 borrow
         vm.expectRevert(DeFiLend.InsufficientCollateral.selector);
-        lending.borrow(81e18);
+        lending.borrow(1601e18); // $1601 > $1600 limit
         vm.stopPrank();
+    }
+
+    function testOracleBasedHealthFactor() public {
+        vm.startPrank(user);
+        lending.deposit(1e18); // 1 COL @ $2000
+        lending.borrow(1000e18); // 1000 BOR @ $1
+        vm.stopPrank();
+
+        // HF = (1 * 2000 * 80) / (1000 * 1 * 100) = 1.6
+        assertEq(lending.getHealthFactor(user), 16e17);
+
+        // Price of COL drops to $1500
+        collateralFeed.updateAnswer(1500e8);
+
+        // HF = (1 * 1500 * 80) / (1000 * 1 * 100) = 1.2
+        assertEq(lending.getHealthFactor(user), 12e17);
+
+        // Price of COL drops to $1000
+        collateralFeed.updateAnswer(1000e8);
+
+        // HF = (1 * 1000 * 80) / (1000 * 1 * 100) = 0.8
+        assertEq(lending.getHealthFactor(user), 8e17);
     }
 
     function testRepay() public {
         vm.startPrank(user);
-        lending.deposit(100e18);
-        lending.borrow(50e18);
+        lending.deposit(1e18);
+        lending.borrow(1000e18);
 
         borrowToken.approve(address(lending), type(uint256).max);
-        lending.repay(25e18);
+        lending.repay(500e18);
         vm.stopPrank();
 
-        // Health factor should improve: (100 * 80 / 100) / 25 * 1e18 = 3.2e18
-        assertEq(lending.getHealthFactor(user), 320e16);
+        // HF = (1 * 2000 * 80) / (500 * 1 * 100) = 3.2
+        assertEq(lending.getHealthFactor(user), 32e17);
     }
 
-    function testLiquidation() public {
-        // Create a fresh lending pool for a clean test
-        DeFiLend lending2 = new DeFiLend(
-            address(collateralToken),
-            address(borrowToken)
-        );
-        borrowToken.mint(address(lending2), 1000e18);
-
-        address borrower = address(10);
-        collateralToken.mint(borrower, 1000e18);
-
-        vm.startPrank(borrower);
-        collateralToken.approve(address(lending2), type(uint256).max);
-        lending2.deposit(100e18);
-        lending2.borrow(80e18); // HF = 1.0 exactly
+    function testPriceCrashLiquidation() public {
+        vm.startPrank(user);
+        lending.deposit(1e18); // 1 COL @ $2000
+        lending.borrow(1500e18); // 1500 BOR @ $1 — HF = 1.066..
         vm.stopPrank();
 
-        // Simulate price crash: override storage to set collateral = 90e18, borrow = 80e18
-        // OZ v5 uses transient-like storage — we try each possible mapping slot
-        uint128 newCollateral = 90e18;
-        uint128 currentBorrow = 80e18;
-        bytes32 packedValue = bytes32(
-            (uint256(currentBorrow) << 128) | uint256(newCollateral)
-        );
+        // Crash COL to $1800 — HF = (1 * 1800 * 80) / (1500 * 1 * 100) = 0.96 < 1
+        collateralFeed.updateAnswer(1800e8);
+        assertTrue(lending.getHealthFactor(user) < 1e18, "Should be unhealthy");
 
-        bool found = false;
-        for (uint256 s = 0; s <= 10; s++) {
-            bytes32 accountSlot = keccak256(abi.encode(borrower, s));
-            vm.store(address(lending2), accountSlot, packedValue);
-            (uint128 col, uint128 bor) = lending2.userAccounts(borrower);
-            if (col == newCollateral && bor == currentBorrow) {
-                found = true;
-                break;
-            }
-            // Reset if wrong slot
-            vm.store(address(lending2), accountSlot, bytes32(0));
-        }
-        assertTrue(found, "Could not find storage slot for userAccounts");
-
-        // Verify account is now unhealthy
-        assertTrue(lending2.getHealthFactor(borrower) < 1e18);
-
-        // Liquidator repays some debt
-        borrowToken.mint(liquidator, 1000e18);
+        // Liquidator repays 500 BOR
+        borrowToken.mint(liquidator, 10000e18);
         vm.startPrank(liquidator);
-        borrowToken.approve(address(lending2), type(uint256).max);
-        lending2.liquidate(borrower, 40e18);
+        borrowToken.approve(address(lending), type(uint256).max);
+
+        lending.liquidate(user, 500e18);
         vm.stopPrank();
 
-        // Liquidator should receive 40 * 1.05 = 42e18 collateral
-        assertEq(collateralToken.balanceOf(liquidator), 42e18);
+        uint256 debtRepaid = 500e18;
+        uint256 bonus = 105; // 100 + LIQUIDATION_BONUS (5)
+        uint256 colPrice = 1800; // collateralPrice in $ (normalized to same decimals as borrow)
+        uint256 expectedSeized = (debtRepaid * bonus) / (colPrice * 100);
+        assertEq(collateralToken.balanceOf(liquidator), expectedSeized);
     }
 
     function testLiquidationRevertsOnHealthyAccount() public {
         vm.startPrank(user);
-        lending.deposit(100e18);
-        lending.borrow(50e18);
+        lending.deposit(1e18);
+        lending.borrow(500e18);
         vm.stopPrank();
 
         borrowToken.mint(liquidator, 100e18);
@@ -119,6 +130,37 @@ contract DeFiLendTest is Test {
         borrowToken.approve(address(lending), type(uint256).max);
         vm.expectRevert(DeFiLend.AccountStillHealthy.selector);
         lending.liquidate(user, 25e18);
+        vm.stopPrank();
+    }
+
+    function testStalePriceReverts() public {
+        vm.startPrank(user);
+        lending.deposit(1e18);
+        vm.stopPrank();
+
+        // Move time forward so subtraction doesn't underflow
+        vm.warp(block.timestamp + 1 days);
+
+        // Make the oracle stale (set updatedAt to >1 hour ago)
+        collateralFeed.setUpdatedAt(block.timestamp - 2 hours);
+
+        vm.startPrank(user);
+        vm.expectRevert(DeFiLend.StaleOraclePrice.selector);
+        lending.borrow(100e18);
+        vm.stopPrank();
+    }
+
+    function testInvalidOraclePriceReverts() public {
+        vm.startPrank(user);
+        lending.deposit(1e18);
+        vm.stopPrank();
+
+        // Set price to 0
+        collateralFeed.updateAnswer(0);
+
+        vm.startPrank(user);
+        vm.expectRevert(DeFiLend.InvalidOraclePrice.selector);
+        lending.borrow(100e18);
         vm.stopPrank();
     }
 
@@ -134,13 +176,58 @@ contract DeFiLendTest is Test {
 
         vm.startPrank(user);
         vm.expectRevert();
-        lending.deposit(100e18);
+        lending.deposit(1e18);
         vm.stopPrank();
 
         lending.unpause();
 
         vm.startPrank(user);
-        lending.deposit(100e18);
+        lending.deposit(1e18);
+        vm.stopPrank();
+    }
+
+    function testPositionUpdatedEvent() public {
+        vm.startPrank(user);
+        vm.expectEmit(true, true, false, true);
+        emit DeFiLend.PositionUpdated(
+            user,
+            address(collateralToken),
+            "deposit",
+            1e18,
+            1e18,
+            0,
+            block.timestamp
+        );
+        lending.deposit(1e18);
+        vm.stopPrank();
+    }
+
+    function testLiquidationExecutedEvent() public {
+        vm.startPrank(user);
+        lending.deposit(1e18);
+        lending.borrow(1500e18);
+        vm.stopPrank();
+
+        // Crash price to trigger liquidation
+        collateralFeed.updateAnswer(1800e8);
+
+        borrowToken.mint(liquidator, 10000e18);
+        vm.startPrank(liquidator);
+        borrowToken.approve(address(lending), type(uint256).max);
+
+        // Just verify event is emitted (check indexed params)
+        vm.expectEmit(true, true, true, false);
+        emit DeFiLend.LiquidationExecuted(
+            liquidator,
+            user,
+            address(collateralToken),
+            address(borrowToken),
+            500e18,
+            0, // don't check exact collateral seized
+            0, // don't check exact health factor
+            0 // don't check exact timestamp
+        );
+        lending.liquidate(user, 500e18);
         vm.stopPrank();
     }
 }

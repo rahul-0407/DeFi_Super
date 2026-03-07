@@ -48,11 +48,13 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     mapping(address => uint256) public feesCollected;
 
     // ──────────────────── Events ────────────────────
-    event FlashLoan(
+    event FlashLoanExecuted(
+        address indexed initiator,
         address indexed borrower,
         address indexed token,
         uint256 amount,
-        uint256 fee
+        uint256 fee,
+        uint256 timestamp
     );
     event TokenSupported(address indexed token, bool supported);
     event FeesWithdrawn(
@@ -136,7 +138,14 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
             feesCollected[token] += fee;
         }
 
-        emit FlashLoan(address(receiver), token, amount, fee);
+        emit FlashLoanExecuted(
+            msg.sender,
+            address(receiver),
+            token,
+            amount,
+            fee,
+            block.timestamp
+        );
     }
 
     // ──────────────────── View Functions ────────────────────
