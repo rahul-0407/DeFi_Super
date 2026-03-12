@@ -214,6 +214,23 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
      * @param amount1Out Desired output of token1
      * @param to Recipient address
      */
+    /**
+     * @notice Force reserves to match balances.
+     */
+    function sync() external nonReentrant {
+        _update(
+            token0.balanceOf(address(this)),
+            token1.balanceOf(address(this))
+        );
+    }
+
+    /**
+     * @notice Swap tokens through the pool.
+     * @dev Enforces constant product invariant with 0.3% fee.
+     * @param amount0Out Desired output of token0
+     * @param amount1Out Desired output of token1
+     * @param to Recipient address
+     */
     function swap(
         uint256 amount0Out,
         uint256 amount1Out,
@@ -223,7 +240,6 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
             revert InsufficientOutputAmount();
         if (to == address(0)) revert InvalidRecipient();
 
-        // Cache reserves
         uint256 _reserve0 = reserve0;
         uint256 _reserve1 = reserve1;
 
@@ -245,9 +261,10 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
 
         if (amount0In == 0 && amount1In == 0) revert InsufficientInputAmount();
 
-        // Constant Product with 0.3% fee
-        uint256 balance0Adjusted = balance0 * 1000 - amount0In * 3;
-        uint256 balance1Adjusted = balance1 * 1000 - amount1In * 3;
+        // Constant Product with 0.3% fee: (x*1000 - dx*3) * (y*1000 - dy*3) >= x*y*1000^2
+        uint256 balance0Adjusted = (balance0 * 1000) - (amount0In * 3);
+        uint256 balance1Adjusted = (balance1 * 1000) - (amount1In * 3);
+
         if (
             balance0Adjusted * balance1Adjusted <
             _reserve0 * _reserve1 * (1000 ** 2)
@@ -257,6 +274,53 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
 
         _update(balance0, balance1);
         emit Swap(msg.sender, amount0In, amount1In, amount0Out, amount1Out, to);
+    }
+
+    // ──────────────────── Pricing Helpers (Standard AMM) ────────────────────
+
+    /**
+     * @notice Returns the amount of tokenB for a given amount of tokenA.
+     */
+    function quote(
+        uint256 amountA,
+        uint256 resA,
+        uint256 resB
+    ) public pure returns (uint256 amountB) {
+        if (amountA == 0) revert InsufficientInputAmount();
+        if (resA == 0 || resB == 0) revert InsufficientLiquidity();
+        amountB = (amountA * resB) / resA;
+    }
+
+    /**
+     * @notice Returns the output amount for a given input.
+     */
+    function getAmountOut(
+        uint256 amountIn,
+        uint256 resIn,
+        uint256 resOut
+    ) public pure returns (uint256 amountOut) {
+        if (amountIn == 0) revert InsufficientInputAmount();
+        if (resIn == 0 || resOut == 0) revert InsufficientLiquidity();
+        uint256 amountInWithFee = amountIn * 997;
+        uint256 numerator = amountInWithFee * resOut;
+        uint256 denominator = (resIn * 1000) + amountInWithFee;
+        amountOut = numerator / denominator;
+    }
+
+    /**
+     * @notice Returns the input amount required for a given output.
+     */
+    function getAmountIn(
+        uint256 amountOut,
+        uint256 resIn,
+        uint256 resOut
+    ) public pure returns (uint256 amountIn) {
+        if (amountOut == 0) revert InsufficientOutputAmount();
+        if (resIn == 0 || resOut == 0 || amountOut >= resOut)
+            revert InsufficientLiquidity();
+        uint256 numerator = resIn * amountOut * 1000;
+        uint256 denominator = (resOut - amountOut) * 997;
+        amountIn = (numerator / denominator) + 1;
     }
 
     // ──────────────────── Owner Functions ────────────────────

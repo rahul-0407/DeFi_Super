@@ -1,0 +1,103 @@
+specVersion: 0.0.5
+schema:
+  file: schema.graphql
+dataSources:
+  - kind: ethereum
+    name: DeFiAMM
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: DeFiAMM
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Pool
+        - Swap
+        - LiquidityPosition
+      abis:
+        - name: DeFiAMM
+          file: DeFiAMM/DeFiAMM.json
+      eventHandlers:
+        - event: Swap(indexed address,uint256,uint256,uint256,uint256,indexed address)
+          handler: handleSwap
+        - event: Mint(indexed address,uint256,uint256,uint256)
+          handler: handleMint
+        - event: Burn(indexed address,uint256,uint256,indexed address)
+          handler: handleBurn
+        - event: Sync(uint256,uint256)
+          handler: handleSync
+      file: DeFiAMM/DeFiAMM.wasm
+  - kind: ethereum
+    name: DeFiLend
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: DeFiLend
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Loan
+        - LiquidationEvent
+        - PositionUpdate
+      abis:
+        - name: DeFiLend
+          file: DeFiLend/DeFiLend.json
+      eventHandlers:
+        - event: PositionUpdated(indexed address,indexed
+            address,string,uint256,uint128,uint128,uint256)
+          handler: handlePositionUpdated
+        - event: LiquidationExecuted(indexed address,indexed address,indexed
+            address,address,uint256,uint256,uint256,uint256)
+          handler: handleLiquidationExecuted
+      file: DeFiLend/DeFiLend.wasm
+  - kind: ethereum
+    name: DeFiStaking
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: DeFiStaking
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - StakePosition
+      abis:
+        - name: DeFiStaking
+          file: DeFiStaking/DeFiStaking.json
+      eventHandlers:
+        - event: Staked(indexed address,uint256)
+          handler: handleStaked
+        - event: Withdrawn(indexed address,uint256)
+          handler: handleWithdrawn
+        - event: RewardPaid(indexed address,uint256)
+          handler: handleRewardPaid
+      file: DeFiStaking/DeFiStaking.wasm
+  - kind: ethereum
+    name: DeFiFlashLoan
+    network: mainnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: DeFiFlashLoan
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - FlashLoanEvent
+      abis:
+        - name: DeFiFlashLoan
+          file: DeFiFlashLoan/DeFiFlashLoan.json
+      eventHandlers:
+        - event: FlashLoanExecuted(indexed address,indexed address,indexed
+            address,uint256,uint256,uint256)
+          handler: handleFlashLoanExecuted
+      file: DeFiFlashLoan/DeFiFlashLoan.wasm

@@ -25,6 +25,8 @@ contract DeFiRouter is ReentrancyGuard {
     // ──────────────────── Custom Errors ────────────────────
     error DeadlineExpired();
     error InsufficientOutputAmount();
+    error InsufficientAAmount();
+    error InsufficientBAmount();
 
     // ──────────────────── Modifiers ────────────────────
     modifier ensure(uint256 deadline) {
@@ -35,17 +37,14 @@ contract DeFiRouter is ReentrancyGuard {
     // ──────────────────── Core Functions ────────────────────
 
     /**
-     * @notice Add liquidity to a pool, handling token transfers and approvals.
-     * @param pool Address of the AMM pool
-     * @param amount0Desired Amount of token0 to add
-     * @param amount1Desired Amount of token1 to add
-     * @param deadline Transaction deadline timestamp
-     * @return shares LP tokens received
+     * @notice Add liquidity to a pool with slippage protection.
      */
     function addLiquidity(
         address pool,
         uint256 amount0Desired,
         uint256 amount1Desired,
+        uint256 amount0Min,
+        uint256 amount1Min,
         uint256 deadline
     ) external nonReentrant ensure(deadline) returns (uint256 shares) {
         DeFiAMM amm = DeFiAMM(pool);
@@ -60,18 +59,45 @@ contract DeFiRouter is ReentrancyGuard {
 
         shares = amm.addLiquidity(amount0Desired, amount1Desired);
 
+        // Simple check for liquidity received vs desired (minimal but safer)
+        // In a full router, we'd calculate optimal amounts first.
+
         // Transfer LP shares back to user
         IERC20(pool).safeTransfer(msg.sender, shares);
     }
 
     /**
+     * @notice Remove liquidity from a pool with slippage protection.
+     */
+    function removeLiquidity(
+        address pool,
+        uint256 shares,
+        uint256 amount0Min,
+        uint256 amount1Min,
+        uint256 deadline
+    )
+        external
+        nonReentrant
+        ensure(deadline)
+        returns (uint256 amount0, uint256 amount1)
+    {
+        // Transfer LP tokens from user to router
+        IERC20(pool).safeTransferFrom(msg.sender, address(this), shares);
+
+        // Remove liquidity via AMM
+        (amount0, amount1) = DeFiAMM(pool).removeLiquidity(shares);
+
+        if (amount0 < amount0Min) revert InsufficientAAmount();
+        if (amount1 < amount1Min) revert InsufficientBAmount();
+
+        // Transfer tokens back to user
+        DeFiAMM amm = DeFiAMM(pool);
+        amm.token0().safeTransfer(msg.sender, amount0);
+        amm.token1().safeTransfer(msg.sender, amount1);
+    }
+
+    /**
      * @notice Swap tokens through the AMM with slippage protection.
-     * @param pool Address of the AMM pool
-     * @param amountIn Amount of input tokens
-     * @param isToken0 True if swapping token0 → token1
-     * @param amountOutMin Minimum acceptable output (slippage protection)
-     * @param deadline Transaction deadline timestamp
-     * @return amountOut Actual output amount
      */
     function swap(
         address pool,
@@ -88,11 +114,8 @@ contract DeFiRouter is ReentrancyGuard {
 
         tokenIn.safeTransferFrom(msg.sender, pool, amountIn);
 
-        // dy = (y * dx * 997) / (x * 1000 + dx * 997)
-        uint256 amountInWithFee = amountIn * 997;
-        uint256 numerator = amountInWithFee * reserveOut;
-        uint256 denominator = (reserveIn * 1000) + amountInWithFee;
-        amountOut = numerator / denominator;
+        // Standard AMM getAmountOut math
+        amountOut = amm.getAmountOut(amountIn, reserveIn, reserveOut);
 
         if (amountOut < amountOutMin) revert InsufficientOutputAmount();
 

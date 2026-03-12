@@ -1,18 +1,18 @@
-import { BigInt, BigDecimal } from "@graphprotocol/graph-ts";
+import { BigInt, BigDecimal, Bytes } from "@graphprotocol/graph-ts";
 import {
     Swap as SwapEvent,
     Mint as MintEvent,
     Burn as BurnEvent,
     Sync as SyncEvent,
-} from "../../contracts/out/DeFiAMM.sol/DeFiAMM";
+} from "../generated/DeFiAMM/DeFiAMM";
 import { Pool, Swap, LiquidityPosition } from "../generated/schema";
 
 function getOrCreatePool(address: string): Pool {
     let pool = Pool.load(address);
     if (pool == null) {
         pool = new Pool(address);
-        pool.token0 = new Uint8Array(20);
-        pool.token1 = new Uint8Array(20);
+        pool.token0 = Bytes.empty();
+        pool.token1 = Bytes.empty();
         pool.reserve0 = BigInt.zero();
         pool.reserve1 = BigInt.zero();
         pool.totalSupply = BigInt.zero();

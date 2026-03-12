@@ -31,9 +31,10 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     error ZeroAmount();
     error StaleOraclePrice();
     error InvalidOraclePrice();
+    error LiquidationRepaidExceedsCloseFactor();
+    error BorrowCapExceeded();
 
     // ──────────────────── Structs (packed) ────────────────────
-    /// @dev Packed into single 256-bit slot for gas efficiency
     struct UserAccount {
         uint128 collateralAmount;
         uint128 borrowAmount;
@@ -47,14 +48,14 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     uint256 public constant LIQUIDATION_THRESHOLD = 80; // 80%
     uint256 public constant LIQUIDATION_BONUS = 5; // 5% bonus to liquidators
+    uint256 public constant CLOSE_FACTOR = 50; // 50% max liquidation per txn
     uint256 public constant ORACLE_STALENESS = 1 hours;
 
     // ──────────────────── State Variables ────────────────────
     mapping(address => UserAccount) public userAccounts;
+    uint256 public borrowCap; // Global borrow cap for simplicity, or per-asset in larger systems
 
     // ──────────────────── Events ────────────────────
-
-    /// @notice Emitted when a user's position changes (deposit, withdraw, borrow, repay)
     event PositionUpdated(
         address indexed user,
         address indexed asset,
@@ -65,7 +66,6 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         uint256 timestamp
     );
 
-    /// @notice Emitted when a liquidation is executed
     event LiquidationExecuted(
         address indexed liquidator,
         address indexed user,
@@ -76,6 +76,8 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         uint256 healthFactorBefore,
         uint256 timestamp
     );
+
+    event BorrowCapUpdated(uint256 newCap);
 
     // ──────────────────── Constructor ────────────────────
     constructor(
@@ -90,11 +92,16 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         borrowPriceFeed = IAggregatorV3(_borrowPriceFeed);
     }
 
+    // ──────────────────── Admin Functions ────────────────────
+    function setBorrowCap(uint256 newCap) external onlyOwner {
+        borrowCap = newCap;
+        emit BorrowCapUpdated(newCap);
+    }
+
     // ──────────────────── Core Functions ────────────────────
 
     /**
      * @notice Deposit collateral to the lending pool.
-     * @param amount Amount of collateral to deposit
      */
     function deposit(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
@@ -115,7 +122,6 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     /**
      * @notice Withdraw collateral if account remains healthy after withdrawal.
-     * @param amount Amount of collateral to withdraw
      */
     function withdraw(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
@@ -137,12 +143,17 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     /**
      * @notice Borrow tokens against deposited collateral.
-     * @param amount Amount to borrow
      */
     function borrow(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
+
+        // Enforce global borrow cap
+        if (borrowCap > 0 && borrowToken.balanceOf(address(this)) < amount)
+            revert BorrowCapExceeded();
+
         userAccounts[msg.sender].borrowAmount += uint128(amount);
         if (!_isHealthy(msg.sender)) revert InsufficientCollateral();
+
         borrowToken.safeTransfer(msg.sender, amount);
 
         UserAccount storage acct = userAccounts[msg.sender];
@@ -159,19 +170,22 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     /**
      * @notice Repay borrowed tokens.
-     * @param amount Amount to repay
      */
     function repay(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
-        borrowToken.safeTransferFrom(msg.sender, address(this), amount);
-        userAccounts[msg.sender].borrowAmount -= uint128(amount);
+
+        uint128 userBorrowed = userAccounts[msg.sender].borrowAmount;
+        uint256 actualRepay = amount > userBorrowed ? userBorrowed : amount;
+
+        borrowToken.safeTransferFrom(msg.sender, address(this), actualRepay);
+        userAccounts[msg.sender].borrowAmount -= uint128(actualRepay);
 
         UserAccount storage acct = userAccounts[msg.sender];
         emit PositionUpdated(
             msg.sender,
             address(borrowToken),
             "repay",
-            amount,
+            actualRepay,
             acct.collateralAmount,
             acct.borrowAmount,
             block.timestamp
@@ -179,46 +193,40 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     }
 
     /**
-     * @notice Liquidate an unhealthy account. Liquidator repays debt and receives collateral + bonus.
-     * @dev Uses Chainlink oracle prices for valuation. Collateral seized accounts for price difference.
-     * @param user Address of the unhealthy borrower
-     * @param amountToRepay Amount of debt to repay on behalf of user
+     * @notice Liquidate an unhealthy account with CLOSE_FACTOR enforcement.
      */
     function liquidate(
         address user,
         uint256 amountToRepay
     ) external nonReentrant whenNotPaused {
-        uint256 healthFactorBefore = this.getHealthFactor(user);
+        uint256 healthFactorBefore = _getHealthFactorInternal(user);
         if (healthFactorBefore >= 1e18) revert AccountStillHealthy();
+
+        UserAccount storage account = userAccounts[user];
+        uint256 maxRepay = (uint256(account.borrowAmount) * CLOSE_FACTOR) / 100;
+        if (amountToRepay > maxRepay)
+            revert LiquidationRepaidExceedsCloseFactor();
 
         borrowToken.safeTransferFrom(msg.sender, address(this), amountToRepay);
 
-        // Calculate collateral to seize using oracle prices
-        // collateralToSeize = (debtRepaid * borrowPrice * (100 + bonus)) / (collateralPrice * 100)
-        (uint256 collateralPrice, uint8 colDecimals) = _getPrice(
-            collateralPriceFeed
-        );
-        (uint256 borrowPrice, uint8 borDecimals) = _getPrice(borrowPriceFeed);
+        (uint256 colPrice, uint8 colDec) = _getPrice(collateralPriceFeed);
+        (uint256 borPrice, uint8 borDec) = _getPrice(borrowPriceFeed);
 
-        uint256 collateralToReceive;
-        unchecked {
-            // Normalize both prices to 18 decimals for consistent math
-            uint256 normalizedBorrowPrice = borrowPrice *
-                (10 ** (18 - borDecimals));
-            uint256 normalizedCollateralPrice = collateralPrice *
-                (10 ** (18 - colDecimals));
+        // Calculate collateral to seize: (debtRepaid * borPrice * 1.05) / colPrice
+        uint256 collateralToSeize = (amountToRepay *
+            borPrice *
+            (10 ** (18 - borDec)) *
+            (100 + LIQUIDATION_BONUS)) /
+            (colPrice * (10 ** (18 - colDec)) * 100);
 
-            collateralToReceive =
-                (amountToRepay *
-                    normalizedBorrowPrice *
-                    (100 + LIQUIDATION_BONUS)) /
-                (normalizedCollateralPrice * 100);
-        }
+        // Cap to user's total collateral
+        if (collateralToSeize > account.collateralAmount)
+            collateralToSeize = account.collateralAmount;
 
-        userAccounts[user].borrowAmount -= uint128(amountToRepay);
-        userAccounts[user].collateralAmount -= uint128(collateralToReceive);
+        account.borrowAmount -= uint128(amountToRepay);
+        account.collateralAmount -= uint128(collateralToSeize);
 
-        collateralToken.safeTransfer(msg.sender, collateralToReceive);
+        collateralToken.safeTransfer(msg.sender, collateralToSeize);
 
         emit LiquidationExecuted(
             msg.sender,
@@ -226,7 +234,7 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
             address(collateralToken),
             address(borrowToken),
             amountToRepay,
-            collateralToReceive,
+            collateralToSeize,
             healthFactorBefore,
             block.timestamp
         );
@@ -234,43 +242,32 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     // ──────────────────── View Functions ────────────────────
 
-    /**
-     * @notice Get health factor for a user. Returns 1000e18 if no borrows.
-     * @dev Health factor = (collateralValue * threshold) / (borrowValue * 100), scaled by 1e18
-     *      collateralValue = collateral * collateralPrice
-     *      borrowValue = borrow * borrowPrice
-     */
     function getHealthFactor(address user) external view returns (uint256) {
+        return _getHealthFactorInternal(user);
+    }
+
+    function _getHealthFactorInternal(
+        address user
+    ) internal view returns (uint256) {
         UserAccount storage account = userAccounts[user];
-        uint128 _borrowAmount = account.borrowAmount;
-        if (_borrowAmount == 0) return 1000e18;
+        uint256 borrows = account.borrowAmount;
+        if (borrows == 0) return 1000e18;
 
-        (uint256 collateralPrice, uint8 colDecimals) = _getPrice(
-            collateralPriceFeed
-        );
-        (uint256 borrowPrice, uint8 borDecimals) = _getPrice(borrowPriceFeed);
+        (uint256 colPrice, uint8 colDec) = _getPrice(collateralPriceFeed);
+        (uint256 borPrice, uint8 borDec) = _getPrice(borrowPriceFeed);
 
-        // Normalize to 18 decimals
-        uint256 collateralValue = uint256(account.collateralAmount) *
-            collateralPrice *
-            (10 ** (18 - colDecimals));
-        uint256 borrowValue = uint256(_borrowAmount) *
-            borrowPrice *
-            (10 ** (18 - borDecimals));
+        uint256 colValue = (uint256(account.collateralAmount) *
+            colPrice *
+            (10 ** (18 - colDec)));
+        uint256 borValue = (uint256(borrows) *
+            borPrice *
+            (10 ** (18 - borDec)));
 
-        return
-            (collateralValue * LIQUIDATION_THRESHOLD * 1e18) /
-            (borrowValue * 100);
+        return (colValue * LIQUIDATION_THRESHOLD * 1e18) / (borValue * 100);
     }
 
     // ──────────────────── Internal Functions ────────────────────
 
-    /**
-     * @notice Fetch price from Chainlink feed with staleness and validity checks.
-     * @param feed The Chainlink price feed to query
-     * @return price The latest price (always positive)
-     * @return feedDecimals The decimals of the price feed
-     */
     function _getPrice(
         IAggregatorV3 feed
     ) internal view returns (uint256 price, uint8 feedDecimals) {
@@ -282,23 +279,7 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     }
 
     function _isHealthy(address user) internal view returns (bool) {
-        UserAccount storage account = userAccounts[user];
-        uint128 _borrowAmount = account.borrowAmount;
-        if (_borrowAmount == 0) return true;
-
-        (uint256 collateralPrice, uint8 colDecimals) = _getPrice(
-            collateralPriceFeed
-        );
-        (uint256 borrowPrice, uint8 borDecimals) = _getPrice(borrowPriceFeed);
-
-        uint256 collateralValue = uint256(account.collateralAmount) *
-            collateralPrice *
-            (10 ** (18 - colDecimals));
-        uint256 borrowValue = uint256(_borrowAmount) *
-            borrowPrice *
-            (10 ** (18 - borDecimals));
-
-        return (collateralValue * LIQUIDATION_THRESHOLD) / 100 >= borrowValue;
+        return _getHealthFactorInternal(user) >= 1e18;
     }
 
     // ──────────────────── Owner Functions ────────────────────

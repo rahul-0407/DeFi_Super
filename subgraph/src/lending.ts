@@ -1,8 +1,8 @@
-import { BigInt } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 import {
     PositionUpdated as PositionUpdatedEvent,
     LiquidationExecuted as LiquidationExecutedEvent,
-} from "../../contracts/out/DeFiLend.sol/DeFiLend";
+} from "../generated/DeFiLend/DeFiLend";
 import {
     Loan,
     LiquidationEvent,
@@ -13,7 +13,7 @@ function getOrCreateLoan(userAddress: string): Loan {
     let loan = Loan.load(userAddress);
     if (loan == null) {
         loan = new Loan(userAddress);
-        loan.user = new Uint8Array(20);
+        loan.user = new Bytes(20);
         loan.collateralAmount = BigInt.zero();
         loan.borrowAmount = BigInt.zero();
         loan.lastUpdated = BigInt.zero();

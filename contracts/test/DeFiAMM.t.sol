@@ -32,7 +32,14 @@ contract DeFiAMMTest is Test {
 
     function testAddLiquidity() public {
         vm.startPrank(user);
-        router.addLiquidity(address(pool), 100e18, 100e18, block.timestamp + 1);
+        router.addLiquidity(
+            address(pool),
+            100e18,
+            100e18,
+            0,
+            0,
+            block.timestamp + 1
+        );
         vm.stopPrank();
 
         assertEq(pool.reserve0(), 100e18);
@@ -54,7 +61,14 @@ contract DeFiAMMTest is Test {
         vm.startPrank(user2);
         token0.approve(address(router), type(uint256).max);
         token1.approve(address(router), type(uint256).max);
-        router.addLiquidity(address(pool), 100e18, 100e18, block.timestamp + 1);
+        router.addLiquidity(
+            address(pool),
+            100e18,
+            100e18,
+            0,
+            0,
+            block.timestamp + 1
+        );
         vm.stopPrank();
 
         // MINIMUM_LIQUIDITY = 1000 locked to address(1)
@@ -71,7 +85,14 @@ contract DeFiAMMTest is Test {
         vm.startPrank(user2);
         token0.approve(address(router), type(uint256).max);
         token1.approve(address(router), type(uint256).max);
-        router.addLiquidity(address(pool), 100e18, 100e18, block.timestamp + 1);
+        router.addLiquidity(
+            address(pool),
+            100e18,
+            100e18,
+            0,
+            0,
+            block.timestamp + 1
+        );
 
         uint256 amountIn = 10e18;
         uint256 expectedOut = 9066108938801491315;
@@ -99,7 +120,14 @@ contract DeFiAMMTest is Test {
         token1.approve(address(router), type(uint256).max);
         token0.approve(address(pool), type(uint256).max);
         token1.approve(address(pool), type(uint256).max);
-        router.addLiquidity(address(pool), 100e18, 100e18, block.timestamp + 1);
+        router.addLiquidity(
+            address(pool),
+            100e18,
+            100e18,
+            0,
+            0,
+            block.timestamp + 1
+        );
 
         uint256 shares = pool.balanceOf(user2);
         pool.removeLiquidity(shares);
@@ -139,7 +167,14 @@ contract DeFiAMMTest is Test {
     function testDeadlineExpired() public {
         vm.startPrank(user);
         vm.expectRevert();
-        router.addLiquidity(address(pool), 100e18, 100e18, block.timestamp - 1);
+        router.addLiquidity(
+            address(pool),
+            100e18,
+            100e18,
+            0,
+            0,
+            block.timestamp - 1
+        );
         vm.stopPrank();
     }
 }

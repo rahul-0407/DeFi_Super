@@ -1,16 +1,16 @@
-import { BigInt } from "@graphprotocol/graph-ts";
+import { BigInt, Bytes } from "@graphprotocol/graph-ts";
 import {
     Staked as StakedEvent,
     Withdrawn as WithdrawnEvent,
     RewardPaid as RewardPaidEvent,
-} from "../../contracts/out/DeFiStaking.sol/DeFiStaking";
+} from "../generated/DeFiStaking/DeFiStaking";
 import { StakePosition } from "../generated/schema";
 
 function getOrCreateStakePosition(userAddress: string): StakePosition {
     let position = StakePosition.load(userAddress);
     if (position == null) {
         position = new StakePosition(userAddress);
-        position.user = new Uint8Array(20);
+        position.user = new Bytes(20);
         position.stakedAmount = BigInt.zero();
         position.totalRewardsClaimed = BigInt.zero();
         position.lastUpdated = BigInt.zero();

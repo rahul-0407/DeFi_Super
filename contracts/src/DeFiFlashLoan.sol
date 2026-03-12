@@ -30,6 +30,7 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     error FlashLoanCallbackFailed();
     error FlashLoanNotRepaid();
     error ZeroAmount();
+    error AmountExceedsMax();
 
     // ──────────────────── Constants ────────────────────
     /// @notice Flash loan fee: 0.09% (9 basis points)
@@ -70,8 +71,6 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
 
     /**
      * @notice Add or remove a token from the supported list.
-     * @param token Token address to configure
-     * @param supported Whether to enable or disable
      */
     function setSupportedToken(
         address token,
@@ -83,8 +82,6 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
 
     /**
      * @notice Withdraw accumulated fees.
-     * @param token Token to withdraw fees for
-     * @param to Recipient address
      */
     function withdrawFees(address token, address to) external onlyOwner {
         uint256 amount = feesCollected[token];
@@ -96,13 +93,7 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     // ──────────────────── Core Functions ────────────────────
 
     /**
-     * @notice Execute a flash loan.
-     * @dev The borrower must implement IFlashBorrower and return CALLBACK_SUCCESS.
-     *      The contract verifies full repayment (principal + fee) after the callback.
-     * @param receiver The flash loan borrower contract
-     * @param token The token to borrow
-     * @param amount The amount to borrow
-     * @param data Arbitrary data to pass to the borrower
+     * @notice Execute a flash loan with strict max amount and repayment checks.
      */
     function flashLoan(
         IFlashBorrower receiver,
@@ -112,6 +103,9 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     ) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         if (!supportedTokens[token]) revert UnsupportedToken();
+
+        uint256 maxLoan = IERC20(token).balanceOf(address(this));
+        if (amount > maxLoan) revert AmountExceedsMax();
 
         uint256 fee = flashFee(amount);
         uint256 balanceBefore = IERC20(token).balanceOf(address(this));
@@ -129,7 +123,7 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
         );
         if (result != CALLBACK_SUCCESS) revert FlashLoanCallbackFailed();
 
-        // Verify repayment
+        // Verify repayment: balance must grow by exactly the fee (or more)
         uint256 balanceAfter = IERC20(token).balanceOf(address(this));
         if (balanceAfter < balanceBefore + fee) revert FlashLoanNotRepaid();
 

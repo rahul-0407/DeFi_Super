@@ -1,5 +1,5 @@
-import { BigInt } from "@graphprotocol/graph-ts";
-import { FlashLoanExecuted as FlashLoanExecutedEvent } from "../../contracts/out/DeFiFlashLoan.sol/DeFiFlashLoan";
+import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { FlashLoanExecuted as FlashLoanExecutedEvent } from "../generated/DeFiFlashLoan/DeFiFlashLoan";
 import { FlashLoanEvent } from "../generated/schema";
 
 export function handleFlashLoanExecuted(
