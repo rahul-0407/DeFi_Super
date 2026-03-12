@@ -33,11 +33,13 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     error InvalidOraclePrice();
     error LiquidationRepaidExceedsCloseFactor();
     error BorrowCapExceeded();
+    error PriceDeviationExceeded();
 
     // ──────────────────── Structs (packed) ────────────────────
     struct UserAccount {
         uint128 collateralAmount;
         uint128 borrowAmount;
+        uint256 interestIndex; // User's interest index at last interaction
     }
 
     // ──────────────────── Constants & Immutables ────────────────────
@@ -50,10 +52,26 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     uint256 public constant LIQUIDATION_BONUS = 5; // 5% bonus to liquidators
     uint256 public constant CLOSE_FACTOR = 50; // 50% max liquidation per txn
     uint256 public constant ORACLE_STALENESS = 1 hours;
+    uint256 public constant PRICE_DEVIATION_THRESHOLD = 5e16; // 5% (1e18 scale)
+    uint256 public constant SECONDS_PER_YEAR = 31536000;
 
     // ──────────────────── State Variables ────────────────────
     mapping(address => UserAccount) public userAccounts;
-    uint256 public borrowCap; // Global borrow cap for simplicity, or per-asset in larger systems
+    uint256 public totalBorrowed;
+    uint256 public borrowCap;
+
+    // Interest Rate state
+    uint256 public baseRate = 2e16; // 2% Base APR
+    uint256 public multiplier = 1e17; // 10% Slope
+    uint256 public reserveFactor = 1e17; // 10% of interest to treasury
+    uint256 public interestIndex = 1e18; // Global interest index
+    uint256 public lastAccrualTime;
+
+    // Price Protection state
+    uint256 public lastPriceCollateral;
+    uint256 public lastPriceBorrow;
+
+    address public treasury;
 
     // ──────────────────── Events ────────────────────
     event PositionUpdated(
@@ -78,6 +96,8 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     );
 
     event BorrowCapUpdated(uint256 newCap);
+    event InterestAccrued(uint256 totalBorrowed, uint256 interestIndex);
+    event TreasuryUpdated(address indexed newTreasury);
 
     // ──────────────────── Constructor ────────────────────
     constructor(
@@ -90,6 +110,8 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         borrowToken = IERC20(_borrowToken);
         collateralPriceFeed = IAggregatorV3(_collateralPriceFeed);
         borrowPriceFeed = IAggregatorV3(_borrowPriceFeed);
+        lastAccrualTime = block.timestamp;
+        treasury = msg.sender;
     }
 
     // ──────────────────── Admin Functions ────────────────────
@@ -105,8 +127,14 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
      */
     function deposit(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
+        accrueInterest();
+        _updateUserDebt(msg.sender);
+
         collateralToken.safeTransferFrom(msg.sender, address(this), amount);
         userAccounts[msg.sender].collateralAmount += uint128(amount);
+
+        // 4️⃣ Seed/Update price for manipulation protection
+        _getPriceWithDeviation(collateralPriceFeed, true);
 
         UserAccount storage acct = userAccounts[msg.sender];
         emit PositionUpdated(
@@ -125,7 +153,11 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
      */
     function withdraw(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
+        accrueInterest();
+        _updateUserDebt(msg.sender);
+
         userAccounts[msg.sender].collateralAmount -= uint128(amount);
+        _getPriceWithDeviation(collateralPriceFeed, true);
         if (!_isHealthy(msg.sender)) revert UnhealthyAccountAfterWithdrawal();
         collateralToken.safeTransfer(msg.sender, amount);
 
@@ -146,12 +178,22 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
      */
     function borrow(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
+        accrueInterest();
+        _updateUserDebt(msg.sender);
 
         // Enforce global borrow cap
-        if (borrowCap > 0 && borrowToken.balanceOf(address(this)) < amount)
+        uint256 newTotalBorrowed = totalBorrowed + amount;
+        if (borrowCap > 0 && newTotalBorrowed > borrowCap)
             revert BorrowCapExceeded();
+        if (borrowToken.balanceOf(address(this)) < amount)
+            revert InsufficientCollateral(); // Not enough liquidity in pool
 
+        totalBorrowed = newTotalBorrowed;
         userAccounts[msg.sender].borrowAmount += uint128(amount);
+
+        _getPriceWithDeviation(collateralPriceFeed, true);
+        _getPriceWithDeviation(borrowPriceFeed, false);
+
         if (!_isHealthy(msg.sender)) revert InsufficientCollateral();
 
         borrowToken.safeTransfer(msg.sender, amount);
@@ -173,12 +215,15 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
      */
     function repay(uint256 amount) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
+        accrueInterest();
+        _updateUserDebt(msg.sender);
 
         uint128 userBorrowed = userAccounts[msg.sender].borrowAmount;
         uint256 actualRepay = amount > userBorrowed ? userBorrowed : amount;
 
         borrowToken.safeTransferFrom(msg.sender, address(this), actualRepay);
         userAccounts[msg.sender].borrowAmount -= uint128(actualRepay);
+        totalBorrowed -= actualRepay;
 
         UserAccount storage acct = userAccounts[msg.sender];
         emit PositionUpdated(
@@ -199,6 +244,9 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         address user,
         uint256 amountToRepay
     ) external nonReentrant whenNotPaused {
+        accrueInterest();
+        _updateUserDebt(user);
+
         uint256 healthFactorBefore = _getHealthFactorInternal(user);
         if (healthFactorBefore >= 1e18) revert AccountStillHealthy();
 
@@ -219,12 +267,13 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
             (100 + LIQUIDATION_BONUS)) /
             (colPrice * (10 ** (18 - colDec)) * 100);
 
-        // Cap to user's total collateral
+        // 5️⃣ Seizure Cap (Accounting Improvement)
         if (collateralToSeize > account.collateralAmount)
             collateralToSeize = account.collateralAmount;
 
         account.borrowAmount -= uint128(amountToRepay);
         account.collateralAmount -= uint128(collateralToSeize);
+        totalBorrowed -= amountToRepay;
 
         collateralToken.safeTransfer(msg.sender, collateralToSeize);
 
@@ -268,6 +317,81 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     // ──────────────────── Internal Functions ────────────────────
 
+    /**
+     * @notice 1️⃣ Interest Rate Model (Linear Utilization-based)
+     */
+    function accrueInterest() public {
+        uint256 timeElapsed = block.timestamp - lastAccrualTime;
+        if (timeElapsed == 0) return;
+
+        uint256 _totalBorrowed = totalBorrowed;
+        if (_totalBorrowed > 0) {
+            uint256 cash = borrowToken.balanceOf(address(this));
+            uint256 utilization = (_totalBorrowed * 1e18) /
+                (_totalBorrowed + cash);
+            uint256 borrowRate = baseRate + (multiplier * utilization) / 1e18;
+            uint256 interest = (_totalBorrowed * borrowRate * timeElapsed) /
+                SECONDS_PER_YEAR;
+
+            totalBorrowed = _totalBorrowed + interest;
+            interestIndex =
+                interestIndex +
+                (interestIndex * interest * 1e18) /
+                (_totalBorrowed * 1e18);
+
+            // 2️⃣ Protocol Treasury Fee (from interest)
+            if (reserveFactor > 0 && treasury != address(0)) {
+                uint256 reserveAmount = (interest * reserveFactor) / 1e18;
+                if (reserveAmount > 0 && cash >= reserveAmount) {
+                    borrowToken.safeTransfer(treasury, reserveAmount);
+                }
+            }
+        }
+
+        lastAccrualTime = block.timestamp;
+        emit InterestAccrued(totalBorrowed, interestIndex);
+    }
+
+    function _updateUserDebt(address user) internal {
+        UserAccount storage acct = userAccounts[user];
+        if (acct.interestIndex == 0) {
+            acct.interestIndex = interestIndex;
+            return;
+        }
+        if (acct.borrowAmount > 0) {
+            uint256 ratio = (interestIndex * 1e18) / acct.interestIndex;
+            acct.borrowAmount = uint128(
+                (uint256(acct.borrowAmount) * ratio) / 1e18
+            );
+        }
+        acct.interestIndex = interestIndex;
+    }
+
+    /**
+     * @notice 4️⃣ Price Manipulation Protection (Deviation Check)
+     */
+    function _getPriceWithDeviation(
+        IAggregatorV3 feed,
+        bool isCollateral
+    ) internal returns (uint256 price, uint8 feedDecimals) {
+        (price, feedDecimals) = _getPrice(feed);
+        uint256 lastPrice = isCollateral
+            ? lastPriceCollateral
+            : lastPriceBorrow;
+
+        if (lastPrice > 0) {
+            uint256 diff = price > lastPrice
+                ? price - lastPrice
+                : lastPrice - price;
+            if ((diff * 1e18) / lastPrice > PRICE_DEVIATION_THRESHOLD) {
+                revert PriceDeviationExceeded();
+            }
+        }
+
+        if (isCollateral) lastPriceCollateral = price;
+        else lastPriceBorrow = price;
+    }
+
     function _getPrice(
         IAggregatorV3 feed
     ) internal view returns (uint256 price, uint8 feedDecimals) {
@@ -283,6 +407,12 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     }
 
     // ──────────────────── Owner Functions ────────────────────
+    function setTreasury(address _treasury) external onlyOwner {
+        if (_treasury == address(0)) revert OwnableInvalidOwner(address(0)); // Re-using a standard approach
+        treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }

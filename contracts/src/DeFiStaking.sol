@@ -136,8 +136,13 @@ contract DeFiStaking is ReentrancyGuard, Ownable, Pausable {
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
-            rewardToken.safeTransfer(msg.sender, reward);
-            emit RewardPaid(msg.sender, reward);
+            // 5️⃣ Accounting Improvement: Cap reward payout by actual balance
+            uint256 balance = rewardToken.balanceOf(address(this));
+            uint256 actualPayout = reward > balance ? balance : reward;
+            if (actualPayout > 0) {
+                rewardToken.safeTransfer(msg.sender, actualPayout);
+                emit RewardPaid(msg.sender, actualPayout);
+            }
         }
     }
 

@@ -31,6 +31,7 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     error FlashLoanNotRepaid();
     error ZeroAmount();
     error AmountExceedsMax();
+    error InvalidTreasury();
 
     // ──────────────────── Constants ────────────────────
     /// @notice Flash loan fee: 0.09% (9 basis points)
@@ -48,6 +49,9 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     /// @notice Total fees collected per token
     mapping(address => uint256) public feesCollected;
 
+    /// @notice Protocol Treasury Address
+    address public treasury;
+
     // ──────────────────── Events ────────────────────
     event FlashLoanExecuted(
         address indexed initiator,
@@ -61,11 +65,14 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     event FeesWithdrawn(
         address indexed token,
         uint256 amount,
-        address indexed to
+        address indexed treasury
     );
+    event TreasuryUpdated(address indexed newTreasury);
 
     // ──────────────────── Constructor ────────────────────
-    constructor() Ownable(msg.sender) {}
+    constructor() Ownable(msg.sender) {
+        treasury = msg.sender;
+    }
 
     // ──────────────────── Admin Functions ────────────────────
 
@@ -81,13 +88,20 @@ contract DeFiFlashLoan is ReentrancyGuard, Ownable, Pausable {
     }
 
     /**
-     * @notice Withdraw accumulated fees.
+     * @notice Withdraw accumulated fees to the treasury.
      */
-    function withdrawFees(address token, address to) external onlyOwner {
+    function withdrawFees(address token) external onlyOwner {
+        if (treasury == address(0)) revert InvalidTreasury();
         uint256 amount = feesCollected[token];
         feesCollected[token] = 0;
-        IERC20(token).safeTransfer(to, amount);
-        emit FeesWithdrawn(token, amount, to);
+        IERC20(token).safeTransfer(treasury, amount);
+        emit FeesWithdrawn(token, amount, treasury);
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        if (_treasury == address(0)) revert InvalidTreasury();
+        treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
     }
 
     // ──────────────────── Core Functions ────────────────────

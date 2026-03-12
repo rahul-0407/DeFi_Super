@@ -40,6 +40,8 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
     // ──────────────────── State Variables ────────────────────
     uint256 public reserve0;
     uint256 public reserve1;
+    address public treasury;
+    uint256 public protocolFeeShare = 166; // 1/6th of 0.3% ≈ 0.05%
 
     // LP Token (inline ERC20)
     string public constant name = "DeFi LP Token";
@@ -77,11 +79,13 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
         address indexed to
     );
     event Sync(uint256 reserve0, uint256 reserve1);
+    event TreasuryUpdated(address indexed newTreasury);
 
     // ──────────────────── Constructor ────────────────────
     constructor(address _token0, address _token1) Ownable(msg.sender) {
         token0 = IERC20(_token0);
         token1 = IERC20(_token1);
+        treasury = msg.sender;
     }
 
     // ──────────────────── LP Token Functions ────────────────────
@@ -208,6 +212,15 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
     }
 
     /**
+     * @notice Recover excess tokens sent directly to pool.
+     */
+    function skim(address to) external nonReentrant {
+        if (to == address(0)) revert InvalidRecipient();
+        token0.safeTransfer(to, token0.balanceOf(address(this)) - reserve0);
+        token1.safeTransfer(to, token1.balanceOf(address(this)) - reserve1);
+    }
+
+    /**
      * @notice Swap tokens through the pool.
      * @dev Enforces constant product invariant with 0.3% fee.
      * @param amount0Out Desired output of token0
@@ -261,15 +274,44 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
 
         if (amount0In == 0 && amount1In == 0) revert InsufficientInputAmount();
 
-        // Constant Product with 0.3% fee: (x*1000 - dx*3) * (y*1000 - dy*3) >= x*y*1000^2
-        uint256 balance0Adjusted = (balance0 * 1000) - (amount0In * 3);
-        uint256 balance1Adjusted = (balance1 * 1000) - (amount1In * 3);
+        uint256 pFee0;
+        uint256 pFee1;
 
-        if (
-            balance0Adjusted * balance1Adjusted <
-            _reserve0 * _reserve1 * (1000 ** 2)
-        ) {
-            revert KInvariantFailed();
+        // 2️⃣ Protocol Treasury Fee (Scoped to reduce stack pressure)
+        {
+            uint256 _protocolFeeShare = protocolFeeShare;
+            address _treasury = treasury;
+            if (_protocolFeeShare > 0 && _treasury != address(0)) {
+                if (amount0In > 0) {
+                    pFee0 = (amount0In * 3 * _protocolFeeShare) / (1000 * 1000);
+                    if (pFee0 > 0) {
+                        token0.safeTransfer(_treasury, pFee0);
+                        balance0 = token0.balanceOf(address(this));
+                    }
+                }
+                if (amount1In > 0) {
+                    pFee1 = (amount1In * 3 * _protocolFeeShare) / (1000 * 1000);
+                    if (pFee1 > 0) {
+                        token1.safeTransfer(_treasury, pFee1);
+                        balance1 = token1.balanceOf(address(this));
+                    }
+                }
+            }
+        }
+
+        // 3️⃣ Invariant Safety: Include protocol fee in invariant check
+        {
+            uint256 balance0Adjusted = ((balance0 + pFee0) * 1000) -
+                (amount0In * 3);
+            uint256 balance1Adjusted = ((balance1 + pFee1) * 1000) -
+                (amount1In * 3);
+
+            if (
+                balance0Adjusted * balance1Adjusted <
+                uint256(_reserve0) * uint256(_reserve1) * 1_000_000
+            ) {
+                revert KInvariantFailed();
+            }
         }
 
         _update(balance0, balance1);
@@ -321,6 +363,12 @@ contract DeFiAMM is ReentrancyGuard, Ownable, Pausable {
         uint256 numerator = resIn * amountOut * 1000;
         uint256 denominator = (resOut - amountOut) * 997;
         amountIn = (numerator / denominator) + 1;
+    }
+
+    function setTreasury(address _treasury) external onlyOwner {
+        if (_treasury == address(0)) revert InvalidRecipient();
+        treasury = _treasury;
+        emit TreasuryUpdated(_treasury);
     }
 
     // ──────────────────── Owner Functions ────────────────────

@@ -132,11 +132,18 @@ contract DeFiFlashLoanTest is Test {
         uint256 fees = flashLoan.feesCollected(address(token));
         assertGt(fees, 0);
 
-        address recipient = address(42);
-        flashLoan.withdrawFees(address(token), recipient);
+        // Treasury defaults to owner (address(this))
+        uint256 balanceBefore = token.balanceOf(address(this));
+        flashLoan.withdrawFees(address(token));
 
-        assertEq(token.balanceOf(recipient), fees);
+        assertEq(token.balanceOf(address(this)), balanceBefore + fees);
         assertEq(flashLoan.feesCollected(address(token)), 0);
+    }
+
+    function testSetTreasury() public {
+        address newTreasury = address(123);
+        flashLoan.setTreasury(newTreasury);
+        assertEq(flashLoan.treasury(), newTreasury);
     }
 
     function testPauseBlock() public {
