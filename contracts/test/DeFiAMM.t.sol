@@ -16,8 +16,8 @@ contract DeFiAMMTest is Test {
 
     function setUp() public {
         owner = address(this);
-        token0 = new MockERC20("Token 0", "TK0");
-        token1 = new MockERC20("Token 1", "TK1");
+        token0 = new MockERC20("Token 0", "TK0", 18);
+        token1 = new MockERC20("Token 1", "TK1", 18);
         pool = new DeFiAMM(address(token0), address(token1));
         router = new DeFiRouter();
 

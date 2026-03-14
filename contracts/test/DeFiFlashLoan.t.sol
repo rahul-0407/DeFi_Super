@@ -47,7 +47,7 @@ contract DeFiFlashLoanTest is Test {
 
     function setUp() public {
         owner = address(this);
-        token = new MockERC20("Test Token", "TST");
+        token = new MockERC20("Test Token", "TST", 18);
         flashLoan = new DeFiFlashLoan();
         borrower = new MockFlashBorrower();
 
@@ -106,7 +106,7 @@ contract DeFiFlashLoanTest is Test {
     }
 
     function testUnsupportedTokenReverts() public {
-        MockERC20 unsupported = new MockERC20("Bad", "BAD");
+        MockERC20 unsupported = new MockERC20("Bad", "BAD", 18);
         vm.expectRevert(DeFiFlashLoan.UnsupportedToken.selector);
         flashLoan.flashLoan(borrower, address(unsupported), 1000e18, "");
     }

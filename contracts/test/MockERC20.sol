@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 contract MockERC20 {
     string public name;
     string public symbol;
-    uint8 public decimals = 18;
+    uint8 public decimals;
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
@@ -18,9 +18,10 @@ contract MockERC20 {
         uint256 value
     );
 
-    constructor(string memory _name, string memory _symbol) {
+    constructor(string memory _name, string memory _symbol, uint8 _decimals) {
         name = _name;
         symbol = _symbol;
+        decimals = _decimals;
     }
 
     function mint(address to, uint256 amount) public {

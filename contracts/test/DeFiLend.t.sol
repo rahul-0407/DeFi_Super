@@ -16,8 +16,8 @@ contract DeFiLendTest is Test {
     address liquidator = address(2);
 
     function setUp() public {
-        collateralToken = new MockERC20("Collateral", "COL");
-        borrowToken = new MockERC20("Borrow", "BOR");
+        collateralToken = new MockERC20("Collateral", "COL", 18);
+        borrowToken = new MockERC20("Borrow", "BOR", 18);
 
         // COL = $2000 (8 decimals like Chainlink ETH/USD)
         collateralFeed = new MockV3Aggregator(8, 2000e8);
@@ -36,10 +36,6 @@ contract DeFiLendTest is Test {
 
         vm.prank(user);
         collateralToken.approve(address(lending), type(uint256).max);
-
-        // Seed initial prices
-        vm.prank(user);
-        lending.deposit(1); // Trigger price update
     }
 
     function testDepositAndBorrow() public {
@@ -117,10 +113,9 @@ contract DeFiLendTest is Test {
         vm.stopPrank();
 
         uint256 bonus = 105; // 100 + LIQUIDATION_BONUS (5)
-        uint256 colPrice = 1800; // collateralPrice in $ (normalized to same decimals as borrow)
+        uint256 colPrice = 1800; // collateralPrice in $
         uint256 debtRepaid = 500e18;
         uint256 expectedSeized = (debtRepaid * bonus) / (colPrice * 100);
-        // Use approx because user debt grew slightly due to interest
         assertApproxEqAbs(
             collateralToken.balanceOf(liquidator),
             expectedSeized,
@@ -197,7 +192,6 @@ contract DeFiLendTest is Test {
 
     function testPositionUpdatedEvent() public {
         vm.startPrank(user);
-        // Only check indexed params (user, asset)
         vm.expectEmit(true, true, false, false);
         emit DeFiLend.PositionUpdated(
             user,
@@ -225,7 +219,6 @@ contract DeFiLendTest is Test {
         vm.startPrank(liquidator);
         borrowToken.approve(address(lending), type(uint256).max);
 
-        // Just verify event is emitted (check indexed params: liquidator, user, collateralAsset)
         vm.expectEmit(true, true, true, false);
         emit DeFiLend.LiquidationExecuted(
             liquidator,
@@ -233,23 +226,69 @@ contract DeFiLendTest is Test {
             address(collateralToken),
             address(borrowToken),
             500e18,
-            0, // don't check exact collateral seized
-            0, // don't check exact health factor
-            0 // don't check exact timestamp
+            0,
+            0,
+            0
         );
         lending.liquidate(user, 500e18);
         vm.stopPrank();
     }
 
-    function testPriceDeviationRevert() public {
+    function testInsufficientPoolLiquidity() public {
+        // Deploy a lending pool with zero borrow token liquidity
+        MockERC20 col2 = new MockERC20("COL2", "C2", 18);
+        MockERC20 bor2 = new MockERC20("BOR2", "B2", 18);
+        DeFiLend emptyLend = new DeFiLend(
+            address(col2),
+            address(bor2),
+            address(collateralFeed),
+            address(borrowFeed)
+        );
+
+        col2.mint(user, 100e18);
         vm.startPrank(user);
-        lending.deposit(1e18);
+        col2.approve(address(emptyLend), type(uint256).max);
+        emptyLend.deposit(10e18);
 
-        // Crash price by 10% instantly (more than 5% threshold)
-        collateralFeed.updateAnswer(1800e8);
-
-        vm.expectRevert(DeFiLend.PriceDeviationExceeded.selector);
-        lending.borrow(100e18);
+        vm.expectRevert(DeFiLend.InsufficientPoolLiquidity.selector);
+        emptyLend.borrow(1e18); // Pool has 0 BOR2 liquidity
         vm.stopPrank();
+    }
+
+    function testGetMaxBorrow() public {
+        vm.startPrank(user);
+        lending.deposit(1e18); // $2000 collateral
+        vm.stopPrank();
+
+        // Max borrow = 2000 * 0.8 = $1600 worth of BOR at $1 = 1600e18
+        assertApproxEqAbs(lending.getMaxBorrow(user), 1600e18, 1e10);
+    }
+
+    function testSupplyBorrowToken() public {
+        MockERC20 col2 = new MockERC20("COL2", "C2", 18);
+        MockERC20 bor2 = new MockERC20("BOR2", "B2", 18);
+        DeFiLend emptyLend = new DeFiLend(
+            address(col2),
+            address(bor2),
+            address(collateralFeed),
+            address(borrowFeed)
+        );
+
+        // Seed liquidity via supplyBorrowToken
+        bor2.mint(address(this), 5000e18);
+        bor2.approve(address(emptyLend), 5000e18);
+        emptyLend.supplyBorrowToken(5000e18);
+
+        assertEq(bor2.balanceOf(address(emptyLend)), 5000e18);
+
+        // Now borrowing should work
+        col2.mint(user, 100e18);
+        vm.startPrank(user);
+        col2.approve(address(emptyLend), type(uint256).max);
+        emptyLend.deposit(1e18); // $2000 collateral
+        emptyLend.borrow(1000e18); // $1000 borrow — within limit
+        vm.stopPrank();
+
+        assertEq(bor2.balanceOf(user), 1000e18);
     }
 }

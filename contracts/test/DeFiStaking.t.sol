@@ -13,8 +13,8 @@ contract DeFiStakingTest is Test {
     address user2 = address(2);
 
     function setUp() public {
-        stakingToken = new MockERC20("Staking Token", "STK");
-        rewardToken = new MockERC20("Reward Token", "RWD");
+        stakingToken = new MockERC20("Staking Token", "STK", 18);
+        rewardToken = new MockERC20("Reward Token", "RWD", 18);
         staking = new DeFiStaking(address(stakingToken), address(rewardToken));
 
         stakingToken.mint(user, 1000e18);
