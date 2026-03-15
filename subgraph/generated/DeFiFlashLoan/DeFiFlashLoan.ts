@@ -7,7 +7,7 @@ import {
   Entity,
   Bytes,
   Address,
-  BigInt
+  BigInt,
 } from "@graphprotocol/graph-ts";
 
 export class FeesWithdrawn extends ethereum.Event {
@@ -31,7 +31,7 @@ export class FeesWithdrawn__Params {
     return this._event.parameters[1].value.toBigInt();
   }
 
-  get to(): Address {
+  get treasury(): Address {
     return this._event.parameters[2].value.toAddress();
   }
 }
@@ -136,6 +136,24 @@ export class TokenSupported__Params {
   }
 }
 
+export class TreasuryUpdated extends ethereum.Event {
+  get params(): TreasuryUpdated__Params {
+    return new TreasuryUpdated__Params(this);
+  }
+}
+
+export class TreasuryUpdated__Params {
+  _event: TreasuryUpdated;
+
+  constructor(event: TreasuryUpdated) {
+    this._event = event;
+  }
+
+  get newTreasury(): Address {
+    return this._event.parameters[0].value.toAddress();
+  }
+}
+
 export class Unpaused extends ethereum.Event {
   get params(): Unpaused__Params {
     return new Unpaused__Params(this);
@@ -169,7 +187,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
     let result = super.tryCall(
       "FLASH_LOAN_FEE",
       "FLASH_LOAN_FEE():(uint256)",
-      []
+      [],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -182,7 +200,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
     let result = super.call(
       "feesCollected",
       "feesCollected(address):(uint256)",
-      [ethereum.Value.fromAddress(param0)]
+      [ethereum.Value.fromAddress(param0)],
     );
 
     return result[0].toBigInt();
@@ -192,7 +210,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
     let result = super.tryCall(
       "feesCollected",
       "feesCollected(address):(uint256)",
-      [ethereum.Value.fromAddress(param0)]
+      [ethereum.Value.fromAddress(param0)],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -203,7 +221,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
 
   flashFee(amount: BigInt): BigInt {
     let result = super.call("flashFee", "flashFee(uint256):(uint256)", [
-      ethereum.Value.fromUnsignedBigInt(amount)
+      ethereum.Value.fromUnsignedBigInt(amount),
     ]);
 
     return result[0].toBigInt();
@@ -211,7 +229,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
 
   try_flashFee(amount: BigInt): ethereum.CallResult<BigInt> {
     let result = super.tryCall("flashFee", "flashFee(uint256):(uint256)", [
-      ethereum.Value.fromUnsignedBigInt(amount)
+      ethereum.Value.fromUnsignedBigInt(amount),
     ]);
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -222,7 +240,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
 
   maxFlashLoan(token: Address): BigInt {
     let result = super.call("maxFlashLoan", "maxFlashLoan(address):(uint256)", [
-      ethereum.Value.fromAddress(token)
+      ethereum.Value.fromAddress(token),
     ]);
 
     return result[0].toBigInt();
@@ -232,7 +250,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
     let result = super.tryCall(
       "maxFlashLoan",
       "maxFlashLoan(address):(uint256)",
-      [ethereum.Value.fromAddress(token)]
+      [ethereum.Value.fromAddress(token)],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -275,7 +293,7 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
     let result = super.call(
       "supportedTokens",
       "supportedTokens(address):(bool)",
-      [ethereum.Value.fromAddress(param0)]
+      [ethereum.Value.fromAddress(param0)],
     );
 
     return result[0].toBoolean();
@@ -285,13 +303,28 @@ export class DeFiFlashLoan extends ethereum.SmartContract {
     let result = super.tryCall(
       "supportedTokens",
       "supportedTokens(address):(bool)",
-      [ethereum.Value.fromAddress(param0)]
+      [ethereum.Value.fromAddress(param0)],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
     }
     let value = result.value;
     return ethereum.CallResult.fromValue(value[0].toBoolean());
+  }
+
+  treasury(): Address {
+    let result = super.call("treasury", "treasury():(address)", []);
+
+    return result[0].toAddress();
+  }
+
+  try_treasury(): ethereum.CallResult<Address> {
+    let result = super.tryCall("treasury", "treasury():(address)", []);
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toAddress());
   }
 }
 
@@ -449,6 +482,36 @@ export class SetSupportedTokenCall__Outputs {
   }
 }
 
+export class SetTreasuryCall extends ethereum.Call {
+  get inputs(): SetTreasuryCall__Inputs {
+    return new SetTreasuryCall__Inputs(this);
+  }
+
+  get outputs(): SetTreasuryCall__Outputs {
+    return new SetTreasuryCall__Outputs(this);
+  }
+}
+
+export class SetTreasuryCall__Inputs {
+  _call: SetTreasuryCall;
+
+  constructor(call: SetTreasuryCall) {
+    this._call = call;
+  }
+
+  get _treasury(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+}
+
+export class SetTreasuryCall__Outputs {
+  _call: SetTreasuryCall;
+
+  constructor(call: SetTreasuryCall) {
+    this._call = call;
+  }
+}
+
 export class TransferOwnershipCall extends ethereum.Call {
   get inputs(): TransferOwnershipCall__Inputs {
     return new TransferOwnershipCall__Inputs(this);
@@ -524,10 +587,6 @@ export class WithdrawFeesCall__Inputs {
 
   get token(): Address {
     return this._call.inputValues[0].value.toAddress();
-  }
-
-  get to(): Address {
-    return this._call.inputValues[1].value.toAddress();
   }
 }
 

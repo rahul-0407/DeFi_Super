@@ -4,9 +4,9 @@ schema:
 dataSources:
   - kind: ethereum
     name: DeFiAMM
-    network: mainnet
+    network: sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0x422C8E1c56284eb20F15aD7f78ff3DAEA8C6A3CD"
       abi: DeFiAMM
       startBlock: 0
     mapping:
@@ -33,9 +33,9 @@ dataSources:
 
   - kind: ethereum
     name: DeFiLend
-    network: mainnet
+    network: sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0x9E71908A202a3A5A333466197DCeBb34291BA708"
       abi: DeFiLend
       startBlock: 0
     mapping:
@@ -58,9 +58,9 @@ dataSources:
 
   - kind: ethereum
     name: DeFiStaking
-    network: mainnet
+    network: sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0x3d7fD172a9907A356Fb24ad171e86879622B4Bb8"
       abi: DeFiStaking
       startBlock: 0
     mapping:
@@ -83,9 +83,9 @@ dataSources:
 
   - kind: ethereum
     name: DeFiFlashLoan
-    network: mainnet
+    network: sepolia
     source:
-      address: "0x0000000000000000000000000000000000000000"
+      address: "0x3AE0c61DCDe535315418381B2bE0BD98077C99bE"
       abi: DeFiFlashLoan
       startBlock: 0
     mapping:

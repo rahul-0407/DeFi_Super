@@ -7,7 +7,7 @@ import {
   Entity,
   Bytes,
   Address,
-  BigInt
+  BigInt,
 } from "@graphprotocol/graph-ts";
 
 export class Approval extends ethereum.Event {
@@ -222,6 +222,24 @@ export class Transfer__Params {
   }
 }
 
+export class TreasuryUpdated extends ethereum.Event {
+  get params(): TreasuryUpdated__Params {
+    return new TreasuryUpdated__Params(this);
+  }
+}
+
+export class TreasuryUpdated__Params {
+  _event: TreasuryUpdated;
+
+  constructor(event: TreasuryUpdated) {
+    this._event = event;
+  }
+
+  get newTreasury(): Address {
+    return this._event.parameters[0].value.toAddress();
+  }
+}
+
 export class Unpaused extends ethereum.Event {
   get params(): Unpaused__Params {
     return new Unpaused__Params(this);
@@ -274,7 +292,7 @@ export class DeFiAMM extends ethereum.SmartContract {
     let result = super.call(
       "MINIMUM_LIQUIDITY",
       "MINIMUM_LIQUIDITY():(uint256)",
-      []
+      [],
     );
 
     return result[0].toBigInt();
@@ -284,7 +302,7 @@ export class DeFiAMM extends ethereum.SmartContract {
     let result = super.tryCall(
       "MINIMUM_LIQUIDITY",
       "MINIMUM_LIQUIDITY():(uint256)",
-      []
+      [],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -299,8 +317,8 @@ export class DeFiAMM extends ethereum.SmartContract {
       "addLiquidity(uint256,uint256):(uint256)",
       [
         ethereum.Value.fromUnsignedBigInt(amount0),
-        ethereum.Value.fromUnsignedBigInt(amount1)
-      ]
+        ethereum.Value.fromUnsignedBigInt(amount1),
+      ],
     );
 
     return result[0].toBigInt();
@@ -308,15 +326,15 @@ export class DeFiAMM extends ethereum.SmartContract {
 
   try_addLiquidity(
     amount0: BigInt,
-    amount1: BigInt
+    amount1: BigInt,
   ): ethereum.CallResult<BigInt> {
     let result = super.tryCall(
       "addLiquidity",
       "addLiquidity(uint256,uint256):(uint256)",
       [
         ethereum.Value.fromUnsignedBigInt(amount0),
-        ethereum.Value.fromUnsignedBigInt(amount1)
-      ]
+        ethereum.Value.fromUnsignedBigInt(amount1),
+      ],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -329,7 +347,7 @@ export class DeFiAMM extends ethereum.SmartContract {
     let result = super.call(
       "allowance",
       "allowance(address,address):(uint256)",
-      [ethereum.Value.fromAddress(param0), ethereum.Value.fromAddress(param1)]
+      [ethereum.Value.fromAddress(param0), ethereum.Value.fromAddress(param1)],
     );
 
     return result[0].toBigInt();
@@ -339,7 +357,7 @@ export class DeFiAMM extends ethereum.SmartContract {
     let result = super.tryCall(
       "allowance",
       "allowance(address,address):(uint256)",
-      [ethereum.Value.fromAddress(param0), ethereum.Value.fromAddress(param1)]
+      [ethereum.Value.fromAddress(param0), ethereum.Value.fromAddress(param1)],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -351,7 +369,7 @@ export class DeFiAMM extends ethereum.SmartContract {
   approve(spender: Address, amount: BigInt): boolean {
     let result = super.call("approve", "approve(address,uint256):(bool)", [
       ethereum.Value.fromAddress(spender),
-      ethereum.Value.fromUnsignedBigInt(amount)
+      ethereum.Value.fromUnsignedBigInt(amount),
     ]);
 
     return result[0].toBoolean();
@@ -360,7 +378,7 @@ export class DeFiAMM extends ethereum.SmartContract {
   try_approve(spender: Address, amount: BigInt): ethereum.CallResult<boolean> {
     let result = super.tryCall("approve", "approve(address,uint256):(bool)", [
       ethereum.Value.fromAddress(spender),
-      ethereum.Value.fromUnsignedBigInt(amount)
+      ethereum.Value.fromUnsignedBigInt(amount),
     ]);
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -371,7 +389,7 @@ export class DeFiAMM extends ethereum.SmartContract {
 
   balanceOf(param0: Address): BigInt {
     let result = super.call("balanceOf", "balanceOf(address):(uint256)", [
-      ethereum.Value.fromAddress(param0)
+      ethereum.Value.fromAddress(param0),
     ]);
 
     return result[0].toBigInt();
@@ -379,7 +397,7 @@ export class DeFiAMM extends ethereum.SmartContract {
 
   try_balanceOf(param0: Address): ethereum.CallResult<BigInt> {
     let result = super.tryCall("balanceOf", "balanceOf(address):(uint256)", [
-      ethereum.Value.fromAddress(param0)
+      ethereum.Value.fromAddress(param0),
     ]);
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -401,6 +419,76 @@ export class DeFiAMM extends ethereum.SmartContract {
     }
     let value = result.value;
     return ethereum.CallResult.fromValue(value[0].toI32());
+  }
+
+  getAmountIn(amountOut: BigInt, resIn: BigInt, resOut: BigInt): BigInt {
+    let result = super.call(
+      "getAmountIn",
+      "getAmountIn(uint256,uint256,uint256):(uint256)",
+      [
+        ethereum.Value.fromUnsignedBigInt(amountOut),
+        ethereum.Value.fromUnsignedBigInt(resIn),
+        ethereum.Value.fromUnsignedBigInt(resOut),
+      ],
+    );
+
+    return result[0].toBigInt();
+  }
+
+  try_getAmountIn(
+    amountOut: BigInt,
+    resIn: BigInt,
+    resOut: BigInt,
+  ): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "getAmountIn",
+      "getAmountIn(uint256,uint256,uint256):(uint256)",
+      [
+        ethereum.Value.fromUnsignedBigInt(amountOut),
+        ethereum.Value.fromUnsignedBigInt(resIn),
+        ethereum.Value.fromUnsignedBigInt(resOut),
+      ],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
+  getAmountOut(amountIn: BigInt, resIn: BigInt, resOut: BigInt): BigInt {
+    let result = super.call(
+      "getAmountOut",
+      "getAmountOut(uint256,uint256,uint256):(uint256)",
+      [
+        ethereum.Value.fromUnsignedBigInt(amountIn),
+        ethereum.Value.fromUnsignedBigInt(resIn),
+        ethereum.Value.fromUnsignedBigInt(resOut),
+      ],
+    );
+
+    return result[0].toBigInt();
+  }
+
+  try_getAmountOut(
+    amountIn: BigInt,
+    resIn: BigInt,
+    resOut: BigInt,
+  ): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "getAmountOut",
+      "getAmountOut(uint256,uint256,uint256):(uint256)",
+      [
+        ethereum.Value.fromUnsignedBigInt(amountIn),
+        ethereum.Value.fromUnsignedBigInt(resIn),
+        ethereum.Value.fromUnsignedBigInt(resOut),
+      ],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
   }
 
   name(): string {
@@ -448,26 +536,84 @@ export class DeFiAMM extends ethereum.SmartContract {
     return ethereum.CallResult.fromValue(value[0].toBoolean());
   }
 
+  protocolFeeShare(): BigInt {
+    let result = super.call(
+      "protocolFeeShare",
+      "protocolFeeShare():(uint256)",
+      [],
+    );
+
+    return result[0].toBigInt();
+  }
+
+  try_protocolFeeShare(): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "protocolFeeShare",
+      "protocolFeeShare():(uint256)",
+      [],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
+  quote(amountA: BigInt, resA: BigInt, resB: BigInt): BigInt {
+    let result = super.call(
+      "quote",
+      "quote(uint256,uint256,uint256):(uint256)",
+      [
+        ethereum.Value.fromUnsignedBigInt(amountA),
+        ethereum.Value.fromUnsignedBigInt(resA),
+        ethereum.Value.fromUnsignedBigInt(resB),
+      ],
+    );
+
+    return result[0].toBigInt();
+  }
+
+  try_quote(
+    amountA: BigInt,
+    resA: BigInt,
+    resB: BigInt,
+  ): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "quote",
+      "quote(uint256,uint256,uint256):(uint256)",
+      [
+        ethereum.Value.fromUnsignedBigInt(amountA),
+        ethereum.Value.fromUnsignedBigInt(resA),
+        ethereum.Value.fromUnsignedBigInt(resB),
+      ],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
   removeLiquidity(shares: BigInt): DeFiAMM__removeLiquidityResult {
     let result = super.call(
       "removeLiquidity",
       "removeLiquidity(uint256):(uint256,uint256)",
-      [ethereum.Value.fromUnsignedBigInt(shares)]
+      [ethereum.Value.fromUnsignedBigInt(shares)],
     );
 
     return new DeFiAMM__removeLiquidityResult(
       result[0].toBigInt(),
-      result[1].toBigInt()
+      result[1].toBigInt(),
     );
   }
 
   try_removeLiquidity(
-    shares: BigInt
+    shares: BigInt,
   ): ethereum.CallResult<DeFiAMM__removeLiquidityResult> {
     let result = super.tryCall(
       "removeLiquidity",
       "removeLiquidity(uint256):(uint256,uint256)",
-      [ethereum.Value.fromUnsignedBigInt(shares)]
+      [ethereum.Value.fromUnsignedBigInt(shares)],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -476,8 +622,8 @@ export class DeFiAMM extends ethereum.SmartContract {
     return ethereum.CallResult.fromValue(
       new DeFiAMM__removeLiquidityResult(
         value[0].toBigInt(),
-        value[1].toBigInt()
-      )
+        value[1].toBigInt(),
+      ),
     );
   }
 
@@ -574,7 +720,7 @@ export class DeFiAMM extends ethereum.SmartContract {
   transfer(to: Address, amount: BigInt): boolean {
     let result = super.call("transfer", "transfer(address,uint256):(bool)", [
       ethereum.Value.fromAddress(to),
-      ethereum.Value.fromUnsignedBigInt(amount)
+      ethereum.Value.fromUnsignedBigInt(amount),
     ]);
 
     return result[0].toBoolean();
@@ -583,7 +729,7 @@ export class DeFiAMM extends ethereum.SmartContract {
   try_transfer(to: Address, amount: BigInt): ethereum.CallResult<boolean> {
     let result = super.tryCall("transfer", "transfer(address,uint256):(bool)", [
       ethereum.Value.fromAddress(to),
-      ethereum.Value.fromUnsignedBigInt(amount)
+      ethereum.Value.fromUnsignedBigInt(amount),
     ]);
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -599,8 +745,8 @@ export class DeFiAMM extends ethereum.SmartContract {
       [
         ethereum.Value.fromAddress(from),
         ethereum.Value.fromAddress(to),
-        ethereum.Value.fromUnsignedBigInt(amount)
-      ]
+        ethereum.Value.fromUnsignedBigInt(amount),
+      ],
     );
 
     return result[0].toBoolean();
@@ -609,7 +755,7 @@ export class DeFiAMM extends ethereum.SmartContract {
   try_transferFrom(
     from: Address,
     to: Address,
-    amount: BigInt
+    amount: BigInt,
   ): ethereum.CallResult<boolean> {
     let result = super.tryCall(
       "transferFrom",
@@ -617,14 +763,29 @@ export class DeFiAMM extends ethereum.SmartContract {
       [
         ethereum.Value.fromAddress(from),
         ethereum.Value.fromAddress(to),
-        ethereum.Value.fromUnsignedBigInt(amount)
-      ]
+        ethereum.Value.fromUnsignedBigInt(amount),
+      ],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
     }
     let value = result.value;
     return ethereum.CallResult.fromValue(value[0].toBoolean());
+  }
+
+  treasury(): Address {
+    let result = super.call("treasury", "treasury():(address)", []);
+
+    return result[0].toAddress();
+  }
+
+  try_treasury(): ethereum.CallResult<Address> {
+    let result = super.tryCall("treasury", "treasury():(address)", []);
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toAddress());
   }
 }
 
@@ -828,6 +989,66 @@ export class RenounceOwnershipCall__Outputs {
   }
 }
 
+export class SetTreasuryCall extends ethereum.Call {
+  get inputs(): SetTreasuryCall__Inputs {
+    return new SetTreasuryCall__Inputs(this);
+  }
+
+  get outputs(): SetTreasuryCall__Outputs {
+    return new SetTreasuryCall__Outputs(this);
+  }
+}
+
+export class SetTreasuryCall__Inputs {
+  _call: SetTreasuryCall;
+
+  constructor(call: SetTreasuryCall) {
+    this._call = call;
+  }
+
+  get _treasury(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+}
+
+export class SetTreasuryCall__Outputs {
+  _call: SetTreasuryCall;
+
+  constructor(call: SetTreasuryCall) {
+    this._call = call;
+  }
+}
+
+export class SkimCall extends ethereum.Call {
+  get inputs(): SkimCall__Inputs {
+    return new SkimCall__Inputs(this);
+  }
+
+  get outputs(): SkimCall__Outputs {
+    return new SkimCall__Outputs(this);
+  }
+}
+
+export class SkimCall__Inputs {
+  _call: SkimCall;
+
+  constructor(call: SkimCall) {
+    this._call = call;
+  }
+
+  get to(): Address {
+    return this._call.inputValues[0].value.toAddress();
+  }
+}
+
+export class SkimCall__Outputs {
+  _call: SkimCall;
+
+  constructor(call: SkimCall) {
+    this._call = call;
+  }
+}
+
 export class SwapCall extends ethereum.Call {
   get inputs(): SwapCall__Inputs {
     return new SwapCall__Inputs(this);
@@ -862,6 +1083,32 @@ export class SwapCall__Outputs {
   _call: SwapCall;
 
   constructor(call: SwapCall) {
+    this._call = call;
+  }
+}
+
+export class SyncCall extends ethereum.Call {
+  get inputs(): SyncCall__Inputs {
+    return new SyncCall__Inputs(this);
+  }
+
+  get outputs(): SyncCall__Outputs {
+    return new SyncCall__Outputs(this);
+  }
+}
+
+export class SyncCall__Inputs {
+  _call: SyncCall;
+
+  constructor(call: SyncCall) {
+    this._call = call;
+  }
+}
+
+export class SyncCall__Outputs {
+  _call: SyncCall;
+
+  constructor(call: SyncCall) {
     this._call = call;
   }
 }

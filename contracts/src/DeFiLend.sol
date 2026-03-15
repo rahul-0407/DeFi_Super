@@ -62,6 +62,7 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     // ──────────────────── State Variables ────────────────────
     mapping(address => UserAccount) public userAccounts;
+    mapping(address => uint256) public suppliedLiquidity; // USDC Lender balances
     uint256 public totalBorrowed;
     uint256 public borrowCap;
 
@@ -248,7 +249,48 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     ) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
         accrueInterest();
+
         borrowToken.safeTransferFrom(msg.sender, address(this), amount);
+        suppliedLiquidity[msg.sender] += amount;
+
+        emit PositionUpdated(
+            msg.sender,
+            address(borrowToken),
+            "supply_liquidity",
+            amount,
+            0,
+            0,
+            block.timestamp
+        );
+    }
+
+    /**
+     * @notice Withdraw supplied USDC liquidity from the pool.
+     */
+    function withdrawLiquidity(
+        uint256 amount
+    ) external nonReentrant whenNotPaused {
+        if (amount == 0) revert ZeroAmount();
+        if (suppliedLiquidity[msg.sender] < amount)
+            revert InsufficientPoolLiquidity();
+
+        // Ensure pool has enough cash (not all borrowed)
+        if (borrowToken.balanceOf(address(this)) < amount)
+            revert InsufficientPoolLiquidity();
+
+        accrueInterest();
+        suppliedLiquidity[msg.sender] -= amount;
+        borrowToken.safeTransfer(msg.sender, amount);
+
+        emit PositionUpdated(
+            msg.sender,
+            address(borrowToken),
+            "withdraw_liquidity",
+            amount,
+            0,
+            0,
+            block.timestamp
+        );
     }
 
     /**

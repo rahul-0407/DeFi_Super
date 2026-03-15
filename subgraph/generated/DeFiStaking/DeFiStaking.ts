@@ -7,7 +7,7 @@ import {
   Entity,
   Bytes,
   Address,
-  BigInt
+  BigInt,
 } from "@graphprotocol/graph-ts";
 
 export class OwnershipTransferred extends ethereum.Event {
@@ -47,6 +47,42 @@ export class Paused__Params {
 
   get account(): Address {
     return this._event.parameters[0].value.toAddress();
+  }
+}
+
+export class RewardAdded extends ethereum.Event {
+  get params(): RewardAdded__Params {
+    return new RewardAdded__Params(this);
+  }
+}
+
+export class RewardAdded__Params {
+  _event: RewardAdded;
+
+  constructor(event: RewardAdded) {
+    this._event = event;
+  }
+
+  get reward(): BigInt {
+    return this._event.parameters[0].value.toBigInt();
+  }
+}
+
+export class RewardDurationUpdated extends ethereum.Event {
+  get params(): RewardDurationUpdated__Params {
+    return new RewardDurationUpdated__Params(this);
+  }
+}
+
+export class RewardDurationUpdated__Params {
+  _event: RewardDurationUpdated;
+
+  constructor(event: RewardDurationUpdated) {
+    this._event = event;
+  }
+
+  get newDuration(): BigInt {
+    return this._event.parameters[0].value.toBigInt();
   }
 }
 
@@ -141,7 +177,7 @@ export class DeFiStaking extends ethereum.SmartContract {
 
   balanceOf(account: Address): BigInt {
     let result = super.call("balanceOf", "balanceOf(address):(uint256)", [
-      ethereum.Value.fromAddress(account)
+      ethereum.Value.fromAddress(account),
     ]);
 
     return result[0].toBigInt();
@@ -149,7 +185,7 @@ export class DeFiStaking extends ethereum.SmartContract {
 
   try_balanceOf(account: Address): ethereum.CallResult<BigInt> {
     let result = super.tryCall("balanceOf", "balanceOf(address):(uint256)", [
-      ethereum.Value.fromAddress(account)
+      ethereum.Value.fromAddress(account),
     ]);
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -160,7 +196,7 @@ export class DeFiStaking extends ethereum.SmartContract {
 
   earned(account: Address): BigInt {
     let result = super.call("earned", "earned(address):(uint256)", [
-      ethereum.Value.fromAddress(account)
+      ethereum.Value.fromAddress(account),
     ]);
 
     return result[0].toBigInt();
@@ -168,8 +204,31 @@ export class DeFiStaking extends ethereum.SmartContract {
 
   try_earned(account: Address): ethereum.CallResult<BigInt> {
     let result = super.tryCall("earned", "earned(address):(uint256)", [
-      ethereum.Value.fromAddress(account)
+      ethereum.Value.fromAddress(account),
     ]);
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
+  lastTimeRewardApplicable(): BigInt {
+    let result = super.call(
+      "lastTimeRewardApplicable",
+      "lastTimeRewardApplicable():(uint256)",
+      [],
+    );
+
+    return result[0].toBigInt();
+  }
+
+  try_lastTimeRewardApplicable(): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "lastTimeRewardApplicable",
+      "lastTimeRewardApplicable():(uint256)",
+      [],
+    );
     if (result.reverted) {
       return new ethereum.CallResult();
     }
@@ -187,7 +246,7 @@ export class DeFiStaking extends ethereum.SmartContract {
     let result = super.tryCall(
       "lastUpdateTime",
       "lastUpdateTime():(uint256)",
-      []
+      [],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -226,6 +285,40 @@ export class DeFiStaking extends ethereum.SmartContract {
     return ethereum.CallResult.fromValue(value[0].toBoolean());
   }
 
+  periodFinish(): BigInt {
+    let result = super.call("periodFinish", "periodFinish():(uint256)", []);
+
+    return result[0].toBigInt();
+  }
+
+  try_periodFinish(): ethereum.CallResult<BigInt> {
+    let result = super.tryCall("periodFinish", "periodFinish():(uint256)", []);
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
+  rewardDuration(): BigInt {
+    let result = super.call("rewardDuration", "rewardDuration():(uint256)", []);
+
+    return result[0].toBigInt();
+  }
+
+  try_rewardDuration(): ethereum.CallResult<BigInt> {
+    let result = super.tryCall(
+      "rewardDuration",
+      "rewardDuration():(uint256)",
+      [],
+    );
+    if (result.reverted) {
+      return new ethereum.CallResult();
+    }
+    let value = result.value;
+    return ethereum.CallResult.fromValue(value[0].toBigInt());
+  }
+
   rewardPerToken(): BigInt {
     let result = super.call("rewardPerToken", "rewardPerToken():(uint256)", []);
 
@@ -236,7 +329,7 @@ export class DeFiStaking extends ethereum.SmartContract {
     let result = super.tryCall(
       "rewardPerToken",
       "rewardPerToken():(uint256)",
-      []
+      [],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -249,7 +342,7 @@ export class DeFiStaking extends ethereum.SmartContract {
     let result = super.call(
       "rewardPerTokenStored",
       "rewardPerTokenStored():(uint256)",
-      []
+      [],
     );
 
     return result[0].toBigInt();
@@ -259,7 +352,7 @@ export class DeFiStaking extends ethereum.SmartContract {
     let result = super.tryCall(
       "rewardPerTokenStored",
       "rewardPerTokenStored():(uint256)",
-      []
+      [],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -300,7 +393,7 @@ export class DeFiStaking extends ethereum.SmartContract {
 
   rewards(param0: Address): BigInt {
     let result = super.call("rewards", "rewards(address):(uint256)", [
-      ethereum.Value.fromAddress(param0)
+      ethereum.Value.fromAddress(param0),
     ]);
 
     return result[0].toBigInt();
@@ -308,7 +401,7 @@ export class DeFiStaking extends ethereum.SmartContract {
 
   try_rewards(param0: Address): ethereum.CallResult<BigInt> {
     let result = super.tryCall("rewards", "rewards(address):(uint256)", [
-      ethereum.Value.fromAddress(param0)
+      ethereum.Value.fromAddress(param0),
     ]);
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -351,7 +444,7 @@ export class DeFiStaking extends ethereum.SmartContract {
     let result = super.call(
       "userRewardPerTokenPaid",
       "userRewardPerTokenPaid(address):(uint256)",
-      [ethereum.Value.fromAddress(param0)]
+      [ethereum.Value.fromAddress(param0)],
     );
 
     return result[0].toBigInt();
@@ -361,7 +454,7 @@ export class DeFiStaking extends ethereum.SmartContract {
     let result = super.tryCall(
       "userRewardPerTokenPaid",
       "userRewardPerTokenPaid(address):(uint256)",
-      [ethereum.Value.fromAddress(param0)]
+      [ethereum.Value.fromAddress(param0)],
     );
     if (result.reverted) {
       return new ethereum.CallResult();
@@ -431,6 +524,36 @@ export class GetRewardCall__Outputs {
   }
 }
 
+export class NotifyRewardAmountCall extends ethereum.Call {
+  get inputs(): NotifyRewardAmountCall__Inputs {
+    return new NotifyRewardAmountCall__Inputs(this);
+  }
+
+  get outputs(): NotifyRewardAmountCall__Outputs {
+    return new NotifyRewardAmountCall__Outputs(this);
+  }
+}
+
+export class NotifyRewardAmountCall__Inputs {
+  _call: NotifyRewardAmountCall;
+
+  constructor(call: NotifyRewardAmountCall) {
+    this._call = call;
+  }
+
+  get reward(): BigInt {
+    return this._call.inputValues[0].value.toBigInt();
+  }
+}
+
+export class NotifyRewardAmountCall__Outputs {
+  _call: NotifyRewardAmountCall;
+
+  constructor(call: NotifyRewardAmountCall) {
+    this._call = call;
+  }
+}
+
 export class PauseCall extends ethereum.Call {
   get inputs(): PauseCall__Inputs {
     return new PauseCall__Inputs(this);
@@ -483,32 +606,32 @@ export class RenounceOwnershipCall__Outputs {
   }
 }
 
-export class SetRewardRateCall extends ethereum.Call {
-  get inputs(): SetRewardRateCall__Inputs {
-    return new SetRewardRateCall__Inputs(this);
+export class SetRewardDurationCall extends ethereum.Call {
+  get inputs(): SetRewardDurationCall__Inputs {
+    return new SetRewardDurationCall__Inputs(this);
   }
 
-  get outputs(): SetRewardRateCall__Outputs {
-    return new SetRewardRateCall__Outputs(this);
+  get outputs(): SetRewardDurationCall__Outputs {
+    return new SetRewardDurationCall__Outputs(this);
   }
 }
 
-export class SetRewardRateCall__Inputs {
-  _call: SetRewardRateCall;
+export class SetRewardDurationCall__Inputs {
+  _call: SetRewardDurationCall;
 
-  constructor(call: SetRewardRateCall) {
+  constructor(call: SetRewardDurationCall) {
     this._call = call;
   }
 
-  get newRate(): BigInt {
+  get _rewardDuration(): BigInt {
     return this._call.inputValues[0].value.toBigInt();
   }
 }
 
-export class SetRewardRateCall__Outputs {
-  _call: SetRewardRateCall;
+export class SetRewardDurationCall__Outputs {
+  _call: SetRewardDurationCall;
 
-  constructor(call: SetRewardRateCall) {
+  constructor(call: SetRewardDurationCall) {
     this._call = call;
   }
 }

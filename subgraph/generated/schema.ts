@@ -8,7 +8,8 @@ import {
   store,
   Bytes,
   BigInt,
-  BigDecimal
+  BigDecimal,
+  Int8,
 } from "@graphprotocol/graph-ts";
 
 export class Pool extends Entity {
@@ -23,7 +24,7 @@ export class Pool extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type Pool must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type Pool must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("Pool", id.toString(), this);
     }
@@ -175,7 +176,7 @@ export class Pool extends Entity {
     return new LiquidityPositionLoader(
       "Pool",
       this.get("id")!.toString(),
-      "positions"
+      "positions",
     );
   }
 }
@@ -192,7 +193,7 @@ export class Swap extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type Swap must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type Swap must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("Swap", id.toString(), this);
     }
@@ -349,7 +350,7 @@ export class LiquidityPosition extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type LiquidityPosition must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type LiquidityPosition must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("LiquidityPosition", id.toString(), this);
     }
@@ -357,13 +358,13 @@ export class LiquidityPosition extends Entity {
 
   static loadInBlock(id: string): LiquidityPosition | null {
     return changetype<LiquidityPosition | null>(
-      store.get_in_block("LiquidityPosition", id)
+      store.get_in_block("LiquidityPosition", id),
     );
   }
 
   static load(id: string): LiquidityPosition | null {
     return changetype<LiquidityPosition | null>(
-      store.get("LiquidityPosition", id)
+      store.get("LiquidityPosition", id),
     );
   }
 
@@ -458,7 +459,7 @@ export class Loan extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type Loan must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type Loan must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("Loan", id.toString(), this);
     }
@@ -550,7 +551,7 @@ export class LiquidationEvent extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type LiquidationEvent must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type LiquidationEvent must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("LiquidationEvent", id.toString(), this);
     }
@@ -558,13 +559,13 @@ export class LiquidationEvent extends Entity {
 
   static loadInBlock(id: string): LiquidationEvent | null {
     return changetype<LiquidationEvent | null>(
-      store.get_in_block("LiquidationEvent", id)
+      store.get_in_block("LiquidationEvent", id),
     );
   }
 
   static load(id: string): LiquidationEvent | null {
     return changetype<LiquidationEvent | null>(
-      store.get("LiquidationEvent", id)
+      store.get("LiquidationEvent", id),
     );
   }
 
@@ -711,7 +712,7 @@ export class PositionUpdate extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type PositionUpdate must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type PositionUpdate must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("PositionUpdate", id.toString(), this);
     }
@@ -719,7 +720,7 @@ export class PositionUpdate extends Entity {
 
   static loadInBlock(id: string): PositionUpdate | null {
     return changetype<PositionUpdate | null>(
-      store.get_in_block("PositionUpdate", id)
+      store.get_in_block("PositionUpdate", id),
     );
   }
 
@@ -857,7 +858,7 @@ export class StakePosition extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type StakePosition must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type StakePosition must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("StakePosition", id.toString(), this);
     }
@@ -865,7 +866,7 @@ export class StakePosition extends Entity {
 
   static loadInBlock(id: string): StakePosition | null {
     return changetype<StakePosition | null>(
-      store.get_in_block("StakePosition", id)
+      store.get_in_block("StakePosition", id),
     );
   }
 
@@ -951,7 +952,7 @@ export class FlashLoanEvent extends Entity {
     if (id) {
       assert(
         id.kind == ValueKind.STRING,
-        `Entities of type FlashLoanEvent must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`
+        `Entities of type FlashLoanEvent must have an ID of type String but the id '${id.displayData()}' is of type ${id.displayKind()}`,
       );
       store.set("FlashLoanEvent", id.toString(), this);
     }
@@ -959,7 +960,7 @@ export class FlashLoanEvent extends Entity {
 
   static loadInBlock(id: string): FlashLoanEvent | null {
     return changetype<FlashLoanEvent | null>(
-      store.get_in_block("FlashLoanEvent", id)
+      store.get_in_block("FlashLoanEvent", id),
     );
   }
 
