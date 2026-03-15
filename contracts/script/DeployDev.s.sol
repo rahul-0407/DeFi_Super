@@ -15,9 +15,9 @@ contract DeployDev is Script {
         vm.startBroadcast();
 
         // 1. Deploy Mock Tokens
-        MockERC20 weth = new MockERC20("Wrapped Ether", "WETH");
-        MockERC20 usdc = new MockERC20("USD Coin", "USDC");
-        MockERC20 defi = new MockERC20("DeFi Super Token", "DEFI");
+        MockERC20 weth = new MockERC20("Wrapped Ether", "WETH", 18);
+        MockERC20 usdc = new MockERC20("USD Coin", "USDC", 6);
+        MockERC20 defi = new MockERC20("DeFi Super Token", "DEFI", 18);
 
         console.log("WETH deployed at:", address(weth));
         console.log("USDC deployed at:", address(usdc));

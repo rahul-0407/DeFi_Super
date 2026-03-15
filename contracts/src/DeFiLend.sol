@@ -57,7 +57,7 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     uint256 public constant LIQUIDATION_THRESHOLD = 80; // 80%
     uint256 public constant LIQUIDATION_BONUS = 5; // 5% bonus to liquidators
     uint256 public constant CLOSE_FACTOR = 50; // 50% max liquidation per txn
-    uint256 public constant ORACLE_STALENESS = 1 hours;
+    uint256 public constant ORACLE_STALENESS = 48 hours;
     uint256 public constant SECONDS_PER_YEAR = 31536000;
 
     // ──────────────────── State Variables ────────────────────
@@ -315,6 +315,38 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     }
 
     /**
+     * @notice Get user's current borrow balance including accrued interest.
+     */
+    function getBorrowBalance(address user) public view returns (uint256) {
+        UserAccount storage acct = userAccounts[user];
+        if (acct.borrowAmount == 0) return 0;
+
+        // Calculate live interest index
+        uint256 _interestIndex = interestIndex;
+        uint256 timeElapsed = block.timestamp - lastAccrualTime;
+        if (timeElapsed > 0) {
+            uint256 _totalBorrowed = totalBorrowed;
+            if (_totalBorrowed > 0) {
+                uint256 cash = borrowToken.balanceOf(address(this));
+                uint256 utilization = (_totalBorrowed * 1e18) /
+                    (_totalBorrowed + cash);
+                uint256 borrowRate = baseRate +
+                    (multiplier * utilization) /
+                    1e18;
+                uint256 interest = (_totalBorrowed * borrowRate * timeElapsed) /
+                    (SECONDS_PER_YEAR * 1e18);
+                _interestIndex =
+                    _interestIndex +
+                    (_interestIndex * interest) /
+                    _totalBorrowed;
+            }
+        }
+
+        uint256 ratio = (_interestIndex * 1e18) / acct.interestIndex;
+        return (uint256(acct.borrowAmount) * ratio) / 1e18;
+    }
+
+    /**
      * @notice Get the maximum amount of borrow token a user can borrow.
      */
     function getMaxBorrow(address user) external view returns (uint256) {
@@ -413,24 +445,29 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
         uint256 _totalBorrowed = totalBorrowed;
         if (_totalBorrowed > 0) {
-            uint256 cash = borrowToken.balanceOf(address(this));
+            uint256 currentCash = borrowToken.balanceOf(address(this));
             uint256 utilization = (_totalBorrowed * 1e18) /
-                (_totalBorrowed + cash);
+                (_totalBorrowed + currentCash);
             uint256 borrowRate = baseRate + (multiplier * utilization) / 1e18;
             uint256 interest = (_totalBorrowed * borrowRate * timeElapsed) /
-                SECONDS_PER_YEAR;
+                (SECONDS_PER_YEAR * 1e18);
 
             totalBorrowed = _totalBorrowed + interest;
             interestIndex =
                 interestIndex +
-                (interestIndex * interest * 1e18) /
-                (_totalBorrowed * 1e18);
+                (interestIndex * interest) /
+                _totalBorrowed;
 
             // Protocol Treasury Fee (from interest)
             if (reserveFactor > 0 && treasury != address(0)) {
                 uint256 reserveAmount = (interest * reserveFactor) / 1e18;
-                if (reserveAmount > 0 && cash >= reserveAmount) {
-                    borrowToken.safeTransfer(treasury, reserveAmount);
+                if (reserveAmount > 0) {
+                    uint256 currentCashInternal = borrowToken.balanceOf(
+                        address(this)
+                    );
+                    if (currentCashInternal >= reserveAmount) {
+                        borrowToken.safeTransfer(treasury, reserveAmount);
+                    }
                 }
             }
         }

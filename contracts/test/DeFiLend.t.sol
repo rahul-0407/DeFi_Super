@@ -115,6 +115,7 @@ contract DeFiLendTest is Test {
         uint256 bonus = 105; // 100 + LIQUIDATION_BONUS (5)
         uint256 colPrice = 1800; // collateralPrice in $
         uint256 debtRepaid = 500e18;
+
         uint256 expectedSeized = (debtRepaid * bonus) / (colPrice * 100);
         assertApproxEqAbs(
             collateralToken.balanceOf(liquidator),
@@ -143,10 +144,10 @@ contract DeFiLendTest is Test {
         vm.stopPrank();
 
         // Move time forward so subtraction doesn't underflow
-        vm.warp(block.timestamp + 1 days);
+        vm.warp(block.timestamp + 10 days);
 
-        // Make the oracle stale (set updatedAt to >1 hour ago)
-        collateralFeed.setUpdatedAt(block.timestamp - 2 hours);
+        // Make the oracle stale (set updatedAt to >48 hours ago)
+        collateralFeed.setUpdatedAt(block.timestamp - 50 hours);
 
         vm.startPrank(user);
         vm.expectRevert(DeFiLend.StaleOraclePrice.selector);
@@ -262,6 +263,23 @@ contract DeFiLendTest is Test {
 
         // Max borrow = 2000 * 0.8 = $1600 worth of BOR at $1 = 1600e18
         assertApproxEqAbs(lending.getMaxBorrow(user), 1600e18, 1e10);
+    }
+
+    function testInterestAccrualBalance() public {
+        vm.startPrank(user);
+        lending.deposit(1e18);
+        lending.borrow(1000e18);
+        vm.stopPrank();
+
+        uint256 balanceInitial = lending.getBorrowBalance(user);
+        assertEq(balanceInitial, 1000e18);
+
+        // Advance time by 1 year
+        vm.warp(block.timestamp + 365 days);
+
+        uint256 balanceAfterYear = lending.getBorrowBalance(user);
+        // Base rate is 2%, utilization will be low but interest should be > 0
+        assertGt(balanceAfterYear, balanceInitial);
     }
 
     function testSupplyBorrowToken() public {
