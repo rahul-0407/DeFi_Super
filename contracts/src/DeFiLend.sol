@@ -62,7 +62,8 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     // ──────────────────── State Variables ────────────────────
     mapping(address => UserAccount) public userAccounts;
-    mapping(address => uint256) public suppliedLiquidity; // USDC Lender balances
+    mapping(address => uint256) public lenderShares; // Share-based accounting for interest distribution
+    uint256 public totalLenderShares;
     uint256 public totalBorrowed;
     uint256 public borrowCap;
 
@@ -250,8 +251,19 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         if (amount == 0) revert ZeroAmount();
         accrueInterest();
 
+        uint256 poolValueBefore = borrowToken.balanceOf(address(this)) +
+            totalBorrowed;
+        uint256 sharesToMint;
+
+        if (totalLenderShares == 0) {
+            sharesToMint = amount;
+        } else {
+            sharesToMint = (amount * totalLenderShares) / poolValueBefore;
+        }
+
         borrowToken.safeTransferFrom(msg.sender, address(this), amount);
-        suppliedLiquidity[msg.sender] += amount;
+        lenderShares[msg.sender] += sharesToMint;
+        totalLenderShares += sharesToMint;
 
         emit PositionUpdated(
             msg.sender,
@@ -271,15 +283,21 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         uint256 amount
     ) external nonReentrant whenNotPaused {
         if (amount == 0) revert ZeroAmount();
-        if (suppliedLiquidity[msg.sender] < amount)
+        accrueInterest();
+
+        uint256 poolValue = borrowToken.balanceOf(address(this)) +
+            totalBorrowed;
+        uint256 sharesToBurn = (amount * totalLenderShares) / poolValue;
+
+        if (lenderShares[msg.sender] < sharesToBurn)
             revert InsufficientPoolLiquidity();
 
-        // Ensure pool has enough cash (not all borrowed)
+        // Ensure pool has enough cash
         if (borrowToken.balanceOf(address(this)) < amount)
             revert InsufficientPoolLiquidity();
 
-        accrueInterest();
-        suppliedLiquidity[msg.sender] -= amount;
+        lenderShares[msg.sender] -= sharesToBurn;
+        totalLenderShares -= sharesToBurn;
         borrowToken.safeTransfer(msg.sender, amount);
 
         emit PositionUpdated(
@@ -291,6 +309,19 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
             0,
             block.timestamp
         );
+    }
+
+    /**
+     * @notice Helper to get the token value of a lender's shares.
+     */
+    function suppliedLiquidity(
+        address account
+    ) external view returns (uint256) {
+        if (totalLenderShares == 0) return 0;
+        // Calculation includes pending interest (view only)
+        uint256 poolValue = borrowToken.balanceOf(address(this)) +
+            totalBorrowed;
+        return (lenderShares[account] * poolValue) / totalLenderShares;
     }
 
     /**

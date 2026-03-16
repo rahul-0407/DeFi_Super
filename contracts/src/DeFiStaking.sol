@@ -10,6 +10,7 @@ import {
 } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {IDeFiLend} from "./IDeFiLend.sol";
 
 /**
  * @title DeFiStaking
@@ -30,6 +31,7 @@ contract DeFiStaking is ReentrancyGuard, Ownable, Pausable {
     // ──────────────────── Constants & Immutables ────────────────────
     IERC20 public immutable stakingToken;
     IERC20 public immutable rewardToken;
+    IDeFiLend public lendingPool;
 
     // ──────────────────── State Variables ────────────────────
     uint256 public rewardRate;
@@ -114,6 +116,17 @@ contract DeFiStaking is ReentrancyGuard, Ownable, Pausable {
         _totalSupply += amount;
         _balances[msg.sender] += amount;
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+
+        // --- YIELD LOOPING: Supply to Lending Pool ---
+        if (address(lendingPool) != address(0)) {
+            stakingToken.approve(address(lendingPool), amount);
+            if (stakingToken == lendingPool.borrowToken()) {
+                lendingPool.supplyBorrowToken(amount);
+            } else if (stakingToken == lendingPool.collateralToken()) {
+                lendingPool.deposit(amount);
+            }
+        }
+
         emit Staked(msg.sender, amount);
     }
 
@@ -123,6 +136,16 @@ contract DeFiStaking is ReentrancyGuard, Ownable, Pausable {
         if (amount == 0) revert ZeroAmount();
         _totalSupply -= amount;
         _balances[msg.sender] -= amount;
+
+        // --- YIELD LOOPING: Withdraw from Lending Pool ---
+        if (address(lendingPool) != address(0)) {
+            if (stakingToken == lendingPool.borrowToken()) {
+                lendingPool.withdrawLiquidity(amount);
+            } else if (stakingToken == lendingPool.collateralToken()) {
+                lendingPool.withdraw(amount);
+            }
+        }
+
         stakingToken.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
@@ -177,6 +200,10 @@ contract DeFiStaking is ReentrancyGuard, Ownable, Pausable {
             revert("Reward period still active");
         rewardDuration = _rewardDuration;
         emit RewardDurationUpdated(_rewardDuration);
+    }
+
+    function setLendingPool(address _lendingPool) external onlyOwner {
+        lendingPool = IDeFiLend(_lendingPool);
     }
 
     function pause() external onlyOwner {
