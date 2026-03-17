@@ -46,6 +46,10 @@ contract Deploy is Script {
             borrowPriceFeed
         );
         console.log("DeFiLend deployed at:", address(lend));
+        console.log(
+            "Receipt Token (dTokens) deployed at:",
+            address(lend.receiptToken())
+        );
 
         // 5. Deploy Staking (Rewarding with our real DEFI token)
         DeFiStaking staking = new DeFiStaking(stakingToken, address(defiToken));

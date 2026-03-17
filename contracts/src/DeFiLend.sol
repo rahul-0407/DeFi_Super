@@ -3,6 +3,9 @@ pragma solidity ^0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {
+    IERC20Metadata
+} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {
     SafeERC20
 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {
@@ -11,6 +14,7 @@ import {
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {IAggregatorV3} from "./IAggregatorV3.sol";
+import {DeFiReceiptToken} from "./DeFiReceiptToken.sol";
 
 /**
  * @title DeFiLend
@@ -62,8 +66,7 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
     // ──────────────────── State Variables ────────────────────
     mapping(address => UserAccount) public userAccounts;
-    mapping(address => uint256) public lenderShares; // Share-based accounting for interest distribution
-    uint256 public totalLenderShares;
+    DeFiReceiptToken public immutable receiptToken;
     uint256 public totalBorrowed;
     uint256 public borrowCap;
 
@@ -119,6 +122,24 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
         // Cache token decimals at deploy time (saves gas on every price calc)
         collateralTokenDecimals = _getTokenDecimals(_collateralToken);
         borrowTokenDecimals = _getTokenDecimals(_borrowToken);
+
+        // Deploy receipt token
+        receiptToken = new DeFiReceiptToken(
+            string(
+                abi.encodePacked(
+                    "DeFi Super Receipt ",
+                    IERC20Metadata(address(borrowToken)).symbol()
+                )
+            ),
+            string(
+                abi.encodePacked(
+                    "d",
+                    IERC20Metadata(address(borrowToken)).symbol()
+                )
+            ),
+            borrowTokenDecimals,
+            address(this)
+        );
     }
 
     // ──────────────────── Admin Functions ────────────────────
@@ -255,15 +276,15 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
             totalBorrowed;
         uint256 sharesToMint;
 
-        if (totalLenderShares == 0) {
+        uint256 totalShares = receiptToken.totalSupply();
+        if (totalShares == 0) {
             sharesToMint = amount;
         } else {
-            sharesToMint = (amount * totalLenderShares) / poolValueBefore;
+            sharesToMint = (amount * totalShares) / poolValueBefore;
         }
 
         borrowToken.safeTransferFrom(msg.sender, address(this), amount);
-        lenderShares[msg.sender] += sharesToMint;
-        totalLenderShares += sharesToMint;
+        receiptToken.mint(msg.sender, sharesToMint);
 
         emit PositionUpdated(
             msg.sender,
@@ -287,17 +308,17 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
 
         uint256 poolValue = borrowToken.balanceOf(address(this)) +
             totalBorrowed;
-        uint256 sharesToBurn = (amount * totalLenderShares) / poolValue;
+        uint256 totalShares = receiptToken.totalSupply();
+        uint256 sharesToBurn = (amount * totalShares) / poolValue;
 
-        if (lenderShares[msg.sender] < sharesToBurn)
+        if (receiptToken.balanceOf(msg.sender) < sharesToBurn)
             revert InsufficientPoolLiquidity();
 
         // Ensure pool has enough cash
         if (borrowToken.balanceOf(address(this)) < amount)
             revert InsufficientPoolLiquidity();
 
-        lenderShares[msg.sender] -= sharesToBurn;
-        totalLenderShares -= sharesToBurn;
+        receiptToken.burn(msg.sender, sharesToBurn);
         borrowToken.safeTransfer(msg.sender, amount);
 
         emit PositionUpdated(
@@ -317,11 +338,12 @@ contract DeFiLend is ReentrancyGuard, Ownable, Pausable {
     function suppliedLiquidity(
         address account
     ) external view returns (uint256) {
-        if (totalLenderShares == 0) return 0;
+        uint256 totalShares = receiptToken.totalSupply();
+        if (totalShares == 0) return 0;
         // Calculation includes pending interest (view only)
         uint256 poolValue = borrowToken.balanceOf(address(this)) +
             totalBorrowed;
-        return (lenderShares[account] * poolValue) / totalLenderShares;
+        return (receiptToken.balanceOf(account) * poolValue) / totalShares;
     }
 
     /**
