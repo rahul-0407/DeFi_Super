@@ -16,7 +16,7 @@
 
 body {
   color: var(--foreground);
-  background: linear-gradient(135deg, #f5f7a0 0%, #c8f0c0 33%, #d0d8f5 66%, #c5dcf5 100%);
+  background: transparent;
   background-attachment: fixed;
   font-family: 'Space Grotesk', sans-serif;
   overflow-x: hidden;
