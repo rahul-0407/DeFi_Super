@@ -27,7 +27,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@rainbow-me/rainbowkit/styles.css";
 
 // RainbowKit + Wagmi configuration
-const config = getDefaultConfig({
+export const config = getDefaultConfig({
   appName: "DeFi Super App",
   projectId: "a42354fe323a59f0aac50f9268fb301e",
   chains: [foundry, sepolia, mainnet, polygon, optimism, arbitrum, base],

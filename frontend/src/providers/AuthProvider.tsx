@@ -60,6 +60,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const supabase = createClient();
       await supabase.auth.signOut();
     }
+    // Clear demo auth flag so sessions don't persist
+    localStorage.removeItem("defix_auth");
     setUser(null);
     setSession(null);
   };

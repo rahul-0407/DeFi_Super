@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Web3Provider } from "@/providers/Web3Provider";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { LoadingProvider } from "@/providers/LoadingProvider";
 import { ConditionalShell } from "@/components/layout/ConditionalShell";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -25,11 +26,13 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} bg-white text-slate-900 min-h-screen overflow-x-hidden`}>
         <AuthProvider>
-          <Web3Provider>
-            <ConditionalShell>
-              {children}
-            </ConditionalShell>
-          </Web3Provider>
+          <LoadingProvider>
+            <Web3Provider>
+              <ConditionalShell>
+                {children}
+              </ConditionalShell>
+            </Web3Provider>
+          </LoadingProvider>
         </AuthProvider>
       </body>
     </html>

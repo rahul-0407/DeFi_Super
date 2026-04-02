@@ -1,18 +1,18 @@
 "use client";
 
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { 
-  BarChart3, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  RefreshCw, 
-  Layers, 
-  Droplets, 
+  ArrowLeftRight,
+  Landmark,
+  Coins,
   ShieldCheck,
   TrendingUp,
-  Wallet
+  Wallet,
+  Activity,
+  Award,
+  HeartPulse,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from 'next/link';
@@ -20,17 +20,18 @@ import { useAccount, useBalance, useReadContract } from 'wagmi';
 import { formatUnits } from 'viem';
 import { CONTRACT_ADDRESSES, CONTRACT_ABIS } from '@/contracts';
 
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  show: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.4, ease: "easeOut" as const },
+  }),
+};
+
 export default function Dashboard() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
-
-  // Basic auth check
-  useEffect(() => {
-    const isAuth = localStorage.getItem('defix_auth') === 'true';
-    if (!isAuth) {
-      router.push('/');
-    }
-  }, [router]);
 
   // 1. Fetch Balances
   const { data: wethBal } = useBalance({ address, token: CONTRACT_ADDRESSES.WETH });
@@ -115,73 +116,197 @@ export default function Dashboard() {
   }, [healthFactor]);
 
   const stats = [
-    { label: "Portfolio Value", value: `$${getPortfolioValue()}`, change: "+5.2%", color: "text-green-400" },
-    { label: "Unclaimed Rewards", value: `${earnedRewards ? formatUnits(earnedRewards as bigint, 18).slice(0, 8) : "0.00"} DEFI`, change: "Stable", color: "text-purple-400" },
-    { label: "Active Positions", value: activePositionsCount().toString(), change: "Manage", color: "text-blue-400" },
+    { 
+      label: "Portfolio Value", 
+      value: `$${getPortfolioValue()}`, 
+      change: "+5.2%", 
+      icon: Wallet,
+      gradient: "from-blue-500/20 to-cyan-500/20",
+      iconColor: "text-blue-400",
+      borderColor: "border-blue-500/10",
+    },
+    { 
+      label: "Unclaimed Rewards", 
+      value: `${earnedRewards ? formatUnits(earnedRewards as bigint, 18).slice(0, 8) : "0.00"} DEFI`, 
+      change: "Claimable", 
+      icon: Award,
+      gradient: "from-purple-500/20 to-pink-500/20",
+      iconColor: "text-purple-400",
+      borderColor: "border-purple-500/10",
+    },
+    { 
+      label: "Active Positions", 
+      value: activePositionsCount().toString(), 
+      change: "Manage →", 
+      icon: Activity,
+      gradient: "from-emerald-500/20 to-teal-500/20",
+      iconColor: "text-emerald-400",
+      borderColor: "border-emerald-500/10",
+    },
+    { 
+      label: "Health Factor", 
+      value: hfFormatted, 
+      change: Number(hfFormatted) < 1.5 && hfFormatted !== "∞" ? "At Risk" : "Healthy", 
+      icon: HeartPulse,
+      gradient: Number(hfFormatted) < 1.5 && hfFormatted !== "∞" ? "from-red-500/20 to-orange-500/20" : "from-green-500/20 to-emerald-500/20",
+      iconColor: Number(hfFormatted) < 1.5 && hfFormatted !== "∞" ? "text-red-400" : "text-green-400",
+      borderColor: Number(hfFormatted) < 1.5 && hfFormatted !== "∞" ? "border-red-500/10" : "border-green-500/10",
+    },
+  ];
+
+  const quickActions = [
+    { 
+      title: "Swap Tokens", 
+      desc: "Trade instantly with low slippage", 
+      href: "/swap", 
+      icon: ArrowLeftRight,
+      gradient: "from-blue-500 to-cyan-500",
+    },
+    { 
+      title: "Lend Assets", 
+      desc: "Supply collateral & borrow USDC", 
+      href: "/lending", 
+      icon: Landmark,
+      gradient: "from-indigo-500 to-purple-500",
+    },
+    { 
+      title: "Stake WETH", 
+      desc: "Earn DEFI rewards at 23.5% APY", 
+      href: "/staking", 
+      icon: Coins,
+      gradient: "from-purple-500 to-pink-500",
+    },
+  ];
+
+  const tokenBalances = [
+    { name: "WETH", value: wethBal?.formatted?.slice(0, 8) || "0.00", color: "bg-blue-500" },
+    { name: "USDC", value: usdcBal?.formatted?.slice(0, 8) || "0.00", color: "bg-green-500" },
+    { name: "dUSDC", value: dUsdcBal?.formatted?.slice(0, 8) || "0.00", color: "bg-indigo-500" },
+    { name: "DEFI", value: defiBal?.formatted?.slice(0, 8) || "0.00", color: "bg-purple-500" },
   ];
 
   return (
-    <div className="space-y-8 max-w-7xl mx-auto py-10 px-6">
-      <div className="flex justify-between items-center mb-10">
+    <div className="space-y-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-between items-center"
+      >
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Portfolio Overview</h2>
-          <p className="text-gray-400 mt-1">Manage all your DeFi assets in one place.</p>
+          <h2 className="text-2xl font-bold tracking-tight">Portfolio Overview</h2>
+          <p className="text-gray-500 text-sm mt-1">Manage all your DeFi assets in one place.</p>
         </div>
-        <div className="flex items-center gap-4">
-           <button 
-             onClick={() => { localStorage.removeItem('defix_auth'); router.push('/'); }}
-             className="text-xs text-gray-500 hover:text-white transition-colors"
-           >
-             Logout
-           </button>
-           <ConnectButton />
-        </div>
-      </div>
+        <ConnectButton />
+      </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {stats.map((stat, idx) => (
-          <motion.div
-            key={stat.label}
-            className="glass p-6 rounded-2xl relative overflow-hidden group hover:bg-white/5 transition-all"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-sm text-gray-400">{stat.label}</p>
-                <p className="text-2xl font-bold mt-2">{stat.value}</p>
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {stats.map((stat, idx) => {
+          const Icon = stat.icon;
+          return (
+            <motion.div
+              key={stat.label}
+              custom={idx}
+              variants={fadeUp}
+              initial="hidden"
+              animate="show"
+              className={`glass rounded-2xl p-5 relative overflow-hidden group hover:bg-white/[0.06] transition-all duration-300 border ${stat.borderColor}`}
+            >
+              {/* Gradient glow behind icon */}
+              <div className={`absolute -top-4 -right-4 w-20 h-20 rounded-full bg-gradient-to-br ${stat.gradient} blur-2xl opacity-60 group-hover:opacity-100 transition-opacity`} />
+              
+              <div className="relative z-10 flex items-start justify-between">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{stat.label}</p>
+                  <p className="text-2xl font-bold mt-2 tracking-tight">{stat.value}</p>
+                </div>
+                <div className={`w-9 h-9 rounded-xl bg-white/[0.06] flex items-center justify-center ${stat.iconColor}`}>
+                  <Icon size={18} />
+                </div>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full bg-white/5 ${stat.color}`}>
-                {stat.change}
-              </span>
-            </div>
-          </motion.div>
-        ))}
+              <p className={`text-[11px] mt-3 font-medium ${stat.iconColor}`}>{stat.change}</p>
+            </motion.div>
+          );
+        })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <h3 className="text-xl font-semibold">Quick Actions</h3>
+      {/* Token Balances Strip */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.35 }}
+        className="glass rounded-2xl p-4 flex flex-wrap gap-3"
+      >
+        <span className="text-[11px] text-gray-500 uppercase tracking-wider font-medium self-center mr-2">Wallet</span>
+        {tokenBalances.map((t) => (
+          <div key={t.name} className="flex items-center gap-2 bg-white/[0.04] px-3 py-1.5 rounded-lg border border-white/[0.06]">
+            <div className={`w-2 h-2 rounded-full ${t.color}`} />
+            <span className="text-xs font-medium text-gray-300">{t.value}</span>
+            <span className="text-[10px] text-gray-500">{t.name}</span>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Quick Actions + Security */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Quick Actions</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-             {[
-               { title: "Swap Tokens", href: "/swap" },
-               { title: "Lend Assets", href: "/lending" },
-               { title: "Stake DEFI", href: "/staking" },
-             ].map((action) => (
-               <Link key={action.title} href={action.href}>
-                 <button className="glass p-5 rounded-2xl text-left hover:border-white/20 transition-all w-full h-full font-bold">
-                   {action.title}
-                 </button>
-               </Link>
-             ))}
+            {quickActions.map((action, idx) => {
+              const Icon = action.icon;
+              return (
+                <motion.div
+                  key={action.title}
+                  custom={idx + 4}
+                  variants={fadeUp}
+                  initial="hidden"
+                  animate="show"
+                >
+                  <Link href={action.href}>
+                    <div className="glass rounded-2xl p-5 group hover:bg-white/[0.06] transition-all duration-300 cursor-pointer gradient-border-hover h-full">
+                      <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
+                        <Icon size={20} className="text-white" />
+                      </div>
+                      <h4 className="font-bold text-sm">{action.title}</h4>
+                      <p className="text-[11px] text-gray-500 mt-1">{action.desc}</p>
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
         
-        <div className="glass p-8 rounded-3xl">
-           <h3 className="text-xl font-semibold mb-6">Security</h3>
-           <div className="flex items-center gap-4">
-              <ShieldCheck className="text-green-400" />
-              <p className="text-sm text-gray-400">All protocol contracts verified</p>
-           </div>
-        </div>
+        <motion.div 
+          custom={7}
+          variants={fadeUp}
+          initial="hidden"
+          animate="show"
+          className="glass p-6 rounded-2xl border border-green-500/10"
+        >
+          <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider mb-4">Security</h3>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <ShieldCheck size={16} className="text-green-400" />
+              </div>
+              <div>
+                <p className="text-xs font-medium">Contracts Verified</p>
+                <p className="text-[10px] text-gray-500">All protocols audited</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <TrendingUp size={16} className="text-blue-400" />
+              </div>
+              <div>
+                <p className="text-xs font-medium">Real-time Pricing</p>
+                <p className="text-[10px] text-gray-500">Chainlink Oracle feeds</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </div>
   );
