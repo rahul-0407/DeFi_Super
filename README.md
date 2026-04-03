@@ -1,6 +1,34 @@
-# 🏦 DeFi Super — Production-Grade DeFi Protocol
+# 🏛 Pareto — Institutional-Grade DeFi Terminal
 
-A modular, gas-optimized DeFi protocol built with Foundry & Solidity. Features an AMM/DEX with LP tokens, over-collateralized lending, staking rewards, flash loans, and full subgraph indexing.
+A modular, gas-optimized DeFi protocol built with Foundry & Solidity. Features a Constant Product AMM, over-collateralized lending with Chainlink oracles, yield-looping staking rewards, and full subgraph indexing.
+
+---
+
+## 📸 Application Screenshots
+
+Here are some key screenshots from the Pareto Terminal:
+
+![Home Page](./screenshots/hero.png)  
+_Pareto Landing Page — Premium Dark UI_
+
+![Portfolio Dashboard](./screenshots/dashboard.png)  
+_Unified Portfolio Dashboard — Multi-Asset Overview_
+
+![Real-time Analytics](./screenshots/analytics.png)  
+_On-Chain Analytics Hub — Subgraph-Powered Metrics_
+
+![Yield Farming](./screenshots/staking.png)  
+_Incentivized Staking — Automated Yield Looping_
+
+## 🚀 Visual Flow
+
+| Lending & Supply                     | Over-collateralized Borrowing     |
+| ------------------------------------ | --------------------------------- |
+| ![Supply](./screenshots/lending.png) | ![Borrow](./screenshots/lend.png) |
+
+| Protocol Architecture                        | Infrastructure & Security               |
+| -------------------------------------------- | --------------------------------------- |
+| ![Architecture](./screenshots/ecosystem.png) | ![Security](./screenshots/bacckend.png) |
 
 ---
 
@@ -8,16 +36,16 @@ A modular, gas-optimized DeFi protocol built with Foundry & Solidity. Features a
 
 ### System Layers
 
-This diagram illustrates the high-level architecture of the DeFi Super App, showing the flow from the user interface through the smart contract logic to the indexing and analytics layer.
+This diagram illustrates the high-level architecture of the Pareto Terminal, showing the flow from the user interface through the smart contract logic to the indexing and analytics layer.
 
 ```mermaid
 graph TB
     User((User))
 
     subgraph FrontendLayer ["Frontend Layer (Next.js)"]
-        Dashboard[Dashboard UI]
+        Dashboard[Pareto Dashboard]
         Connect[Wagmi / RainbowKit]
-        AnalyticsUI[Analytics Dashboard]
+        AnalyticsUI[Analytics Hub]
     end
 
     subgraph InterfaceLayer ["Interface Layer"]
@@ -289,7 +317,7 @@ forge script script/Deploy.s.sol:Deploy \
 ## 📁 Project Structure
 
 ```
-DeFi_Super/
+Pareto/
 ├── contracts/                # Foundry project
 │   ├── src/
 │   │   ├── DeFiAMM.sol       # AMM with LP tokens

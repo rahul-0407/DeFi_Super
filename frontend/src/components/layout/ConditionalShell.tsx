@@ -36,10 +36,7 @@ export const ConditionalShell = ({
   const isAppRoute = !isPublicRoute;
 
   // Check demo mode auth synchronously from localStorage (no useEffect delay)
-  const [demoAuth, setDemoAuth] = React.useState(() => {
-    if (typeof window === "undefined") return false;
-    return !configured && localStorage.getItem("defix_auth") === "true";
-  });
+  const [demoAuth, setDemoAuth] = React.useState(false);
 
   // Keep demoAuth in sync on navigation (e.g. after sign-out)
   React.useEffect(() => {
