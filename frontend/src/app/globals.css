@@ -1,26 +1,47 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Arapey:ital@0;1&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --color-on-background: #2c2f31;
+  --color-on-background: #0a100d;
   --color-on-surface-variant: #595c5e;
   --color-secondary-fixed: #b1f748;
   --color-secondary-fixed-dim: #a3e839;
   --color-tertiary-fixed: #c3b4fc;
+  --color-mint-accent: #7fffee;
+  --font-serif: "Arapey", serif;
+  --color-deep-green: #203f34;
 }
 
 :root {
-  --background: #f5f7f9;
-  --foreground: #2c2f31;
+  --background: #f0f4f0;
+  --foreground: #0a100d;
+  --footer-bg: #0a100d;
+  --card-bg: rgba(255, 255, 255, 0.6);
 }
 
 body {
   color: var(--foreground);
-  background: transparent;
-  background-attachment: fixed;
-  font-family: "Space Grotesk", sans-serif;
+  background: var(--background);
+  font-family: "Inter", sans-serif;
   overflow-x: hidden;
   position: relative;
+}
+
+.font-serif {
+  font-family: "Arapey", serif;
+}
+
+.glass-nav {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 9999px;
+}
+
+.font-mono-inter {
+  font-family: "Inter", sans-serif;
+  letter-spacing: -0.02em;
 }
 
 /* ===== Dark-Theme Glassmorphism ===== */
@@ -129,6 +150,9 @@ body {
     rgba(168, 85, 247, 0.5)
   );
   -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
