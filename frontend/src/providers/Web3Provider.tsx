@@ -17,7 +17,7 @@ import {
   arbitrum,
   base,
   sepolia,
-  foundry
+  foundry,
 } from "wagmi/chains";
 
 import { http } from "wagmi";
@@ -28,7 +28,7 @@ import "@rainbow-me/rainbowkit/styles.css";
 
 // RainbowKit + Wagmi configuration
 export const config = getDefaultConfig({
-  appName: "DeFi Super App",
+  appName: "Pareto",
   projectId: "a42354fe323a59f0aac50f9268fb301e",
   chains: [foundry, sepolia, mainnet, polygon, optimism, arbitrum, base],
   transports: {

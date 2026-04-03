@@ -22,13 +22,18 @@ const NAV_ITEMS = [
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 
-export const ConditionalShell = ({ children }: { children: React.ReactNode }) => {
+export const ConditionalShell = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, signOut, configured } = useAuth();
 
-  const isLandingOrLogin = pathname === "/" || pathname === "/login";
-  const isAppRoute = !isLandingOrLogin;
+  const isPublicRoute =
+    pathname === "/" || pathname === "/login" || pathname === "/coming-soon";
+  const isAppRoute = !isPublicRoute;
 
   // Check demo mode auth synchronously from localStorage (no useEffect delay)
   const [demoAuth, setDemoAuth] = React.useState(() => {
@@ -52,8 +57,8 @@ export const ConditionalShell = ({ children }: { children: React.ReactNode }) =>
     }
   }, [loading, isAppRoute, isAuthenticated, router]);
 
-  // Landing or login pages — render without shell
-  if (isLandingOrLogin) {
+  // Public pages — render without shell
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 
@@ -80,14 +85,25 @@ export const ConditionalShell = ({ children }: { children: React.ReactNode }) =>
   return (
     <div className="flex min-h-screen bg-[#0A0A0A] text-white">
       {/* Sidebar */}
-      <aside className="w-[260px] border-r border-white/[0.06] hidden md:flex flex-col bg-[#0A0A0A] fixed h-screen z-30">
+      <aside className="w-[260px] border-r border-white/6 hidden md:flex flex-col bg-[#0A0A0A] fixed h-screen z-30">
         {/* Brand */}
         <div className="px-6 pt-7 pb-6 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-            <Zap size={18} className="text-white" />
-          </div>
-          <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            DeFi Super
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 32 32"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M16 4L28 10V22L16 28L4 22V10L16 4Z"
+              stroke="white"
+              strokeWidth="2.5"
+            />
+            <circle cx="16" cy="16" r="6" fill="#77b8a2" />
+          </svg>
+          <h1 className="text-xl font-bold tracking-tight text-white">
+            Pareto
           </h1>
         </div>
 
@@ -102,15 +118,22 @@ export const ConditionalShell = ({ children }: { children: React.ReactNode }) =>
                 href={item.href}
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-medium transition-all duration-200 relative group ${
                   isActive
-                    ? "bg-white/[0.08] text-white"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-white/[0.04]"
+                    ? "bg-white/8 text-white"
+                    : "text-gray-500 hover:text-gray-200 hover:bg-white/4"
                 }`}
               >
                 {/* Active indicator */}
                 {isActive && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-gradient-to-b from-blue-400 to-purple-500" />
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-linear-to-b from-blue-400 to-purple-500" />
                 )}
-                <Icon size={18} className={isActive ? "text-blue-400" : "text-gray-600 group-hover:text-gray-400 transition-colors"} />
+                <Icon
+                  size={18}
+                  className={
+                    isActive
+                      ? "text-blue-400"
+                      : "text-gray-600 group-hover:text-gray-400 transition-colors"
+                  }
+                />
                 {item.name}
               </Link>
             );
@@ -120,7 +143,7 @@ export const ConditionalShell = ({ children }: { children: React.ReactNode }) =>
         {/* Bottom: User & Sign Out */}
         <div className="px-3 pb-6 space-y-2">
           {displayEmail && (
-            <div className="px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-[11px] text-gray-500 truncate">
+            <div className="px-4 py-2 rounded-xl bg-white/3 border border-white/6 text-[11px] text-gray-500 truncate">
               {displayEmail}
             </div>
           )}
@@ -129,7 +152,7 @@ export const ConditionalShell = ({ children }: { children: React.ReactNode }) =>
               await signOut();
               router.push("/");
             }}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] text-gray-500 hover:text-red-400 hover:bg-red-500/[0.06] transition-all duration-200"
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] text-gray-500 hover:text-red-400 hover:bg-red-500/6 transition-all duration-200"
           >
             <LogOut size={16} />
             Sign Out
@@ -139,18 +162,18 @@ export const ConditionalShell = ({ children }: { children: React.ReactNode }) =>
 
       {/* Main Content */}
       <main className="flex-1 md:ml-[260px] overflow-auto min-h-screen">
-        <header className="h-14 border-b border-white/[0.06] flex items-center justify-between px-8 sticky top-0 bg-[#0A0A0A]/80 backdrop-blur-xl z-20">
+        <header className="h-14 border-b border-white/6 flex items-center justify-between px-8 sticky top-0 bg-[#0A0A0A]/80 backdrop-blur-xl z-20">
           <div className="text-[13px] text-gray-500">
             {displayEmail && (
               <span>
                 Signed in as{" "}
-                <span className="text-gray-300 font-medium">{displayEmail}</span>
+                <span className="text-gray-300 font-medium">
+                  {displayEmail}
+                </span>
               </span>
             )}
           </div>
-          <div id="wallet-button">
-            {/* Wallet button injected by page */}
-          </div>
+          <div id="wallet-button">{/* Wallet button injected by page */}</div>
         </header>
         <div className="p-8 pb-20">{children}</div>
       </main>

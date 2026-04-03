@@ -14,10 +14,10 @@ const AngleBox = ({
 }) => {
   const points =
     type === "right"
-      ? "0,0 85,0 100,50 85,100 0,100"
+      ? "1,1 84,1 99,50 84,99 1,99"
       : type === "left"
-        ? "15,0 100,0 100,100 15,100 0,50"
-        : "10,0 90,0 100,50 90,100 10,100 0,50";
+        ? "16,1 99,1 99,99 16,99 1,50"
+        : "11,1 89,1 99,50 89,99 11,99 1,50";
 
   return (
     <div
@@ -126,7 +126,7 @@ const ParetoRoles = () => {
     <section className="py-40 px-6 bg-[#d9e4d9] relative overflow-hidden min-h-screen flex items-center">
       <div className="max-w-7xl mx-auto w-full flex flex-col items-center">
         <h2 className="text-5xl font-serif text-deep-green text-center mb-40">
-          Where Roles Create Value
+          The Pareto Ecosystem
         </h2>
 
         <div className="relative w-full max-w-6xl aspect-video flex items-center justify-center scale-110 lg:scale-125">
@@ -164,7 +164,7 @@ const ParetoRoles = () => {
 
             {/* Main Circle with Pattern */}
             <div className="w-[280px] h-[280px] rounded-full bg-[#dce6dc] border border-deep-green/30 flex items-center justify-center shadow-inner relative z-20 overflow-hidden">
-              <svg className="absolute inset-0 w-full h-full opacity-15">
+              <svg className="absolute inset-0 w-full h-full">
                 <defs>
                   <pattern
                     id="vaultLinePattern"
@@ -181,6 +181,7 @@ const ParetoRoles = () => {
                       y2="0"
                       stroke="#203f34"
                       strokeWidth="2"
+                      opacity="0.4"
                     />
                   </pattern>
                 </defs>
@@ -190,8 +191,8 @@ const ParetoRoles = () => {
                   fill="url(#vaultLinePattern)"
                 />
               </svg>
-              <div className="text-4xl font-serif text-deep-green relative z-10">
-                Credit Vault
+              <div className="text-4xl font-serif text-deep-green relative z-10 text-center px-8">
+                Pareto Hub
               </div>
               {/* Inner glow/shadow */}
               <div className="absolute inset-4 rounded-full border border-white/40 pointer-events-none z-20"></div>
@@ -229,9 +230,9 @@ const ParetoRoles = () => {
             {/* Horizontal Top Arrows (Borrower -> Curator) */}
             <line
               x1="280"
-              y1="180"
+              y1="35"
               x2="720"
-              y2="180"
+              y2="35"
               stroke="#203f34"
               strokeWidth="0.8"
               strokeDasharray="3 3"
@@ -240,23 +241,23 @@ const ParetoRoles = () => {
             />
             <line
               x1="720"
-              y1="215"
+              y1="75"
               x2="280"
-              y2="215"
+              y2="75"
               stroke="#203f34"
               strokeWidth="0.8"
               strokeDasharray="3 3"
               opacity="0.6"
-              markerEnd="url(#arrowhead)"
+              markerEnd="url(#arrowhead-reverse)"
             />
 
             {/* Middle Horizontal Arrows (Boxes) */}
             {/* Interest Payment (Left) */}
             <line
-              x1="180"
-              y1="300"
-              x2="380"
-              y2="300"
+              x1="80"
+              y1="253"
+              x2="300"
+              y2="253"
               stroke="#203f34"
               strokeWidth="1"
               opacity="0.6"
@@ -266,21 +267,21 @@ const ParetoRoles = () => {
             {/* Cycles Management (Right) */}
             <line
               x1="820"
-              y1="300"
-              x2="620"
-              y2="300"
+              y1="253"
+              x2="700"
+              y2="253"
               stroke="#203f34"
               strokeWidth="1"
               opacity="0.6"
-              markerEnd="url(#arrowhead)"
+              markerEnd="url(#arrowhead-reverse)"
             />
 
             {/* Liquidity (Left) */}
             <line
-              x1="180"
-              y1="440"
-              x2="380"
-              y2="440"
+              x1="80"
+              y1="383"
+              x2="300"
+              y2="383"
               stroke="#203f34"
               strokeWidth="1"
               opacity="0.6"
@@ -289,71 +290,71 @@ const ParetoRoles = () => {
 
             {/* Risk Diversification (Right) */}
             <line
-              x1="820"
-              y1="440"
-              x2="620"
-              y2="440"
+              x1="840"
+              y1="383"
+              x2="700"
+              y2="383"
               stroke="#203f34"
               strokeWidth="1"
               opacity="0.6"
-              markerEnd="url(#arrowhead)"
+              markerEnd="url(#arrowhead-reverse)"
             />
 
             {/* Interest Earnings (Bottom) */}
             <line
-              x1="680"
-              y1="550"
+              x1="580"
+              y1="537"
               x2="820"
-              y2="550"
+              y2="537"
               stroke="#203f34"
               strokeWidth="1"
               opacity="0.6"
               markerEnd="url(#arrowhead)"
             />
             <line
-              x1="320"
-              y1="550"
+              x1="420"
+              y1="537"
               x2="180"
-              y2="550"
+              y2="537"
               stroke="#203f34"
               strokeWidth="1"
               opacity="0.6"
-              markerEnd="url(#arrowhead)"
+              markerEnd="url(#arrowhead-reverse)"
             />
 
             {/* Vertical Lines */}
             <line
               x1="100"
-              y1="140"
+              y1="110"
               x2="100"
-              y2="300"
+              y2="270"
               stroke="#203f34"
               strokeWidth="0.8"
               opacity="0.4"
             />
             <line
               x1="100"
-              y1="440"
+              y1="395"
               x2="100"
-              y2="550"
+              y2="520"
               stroke="#203f34"
               strokeWidth="0.8"
               opacity="0.4"
             />
             <line
               x1="900"
-              y1="140"
+              y1="110"
               x2="900"
-              y2="300"
+              y2="270"
               stroke="#203f34"
               strokeWidth="0.8"
               opacity="0.4"
             />
             <line
               x1="900"
-              y1="440"
+              y1="395"
               x2="900"
-              y2="550"
+              y2="520"
               stroke="#203f34"
               strokeWidth="0.8"
               opacity="0.4"
@@ -362,9 +363,9 @@ const ParetoRoles = () => {
             {/* Center Vertical from Vault */}
             <line
               x1="500"
-              y1="520"
+              y1="490"
               x2="500"
-              y2="550"
+              y2="520"
               stroke="#203f34"
               strokeWidth="0.8"
               opacity="0.4"
@@ -372,43 +373,43 @@ const ParetoRoles = () => {
           </svg>
 
           {/* Corner Blocks */}
-          <CornerBlock title="Borrower" position="tl" />
-          <CornerBlock title="Curator" position="tr" />
+          <CornerBlock title="Traders" position="tl" />
+          <CornerBlock title="Curators" position="tr" />
           <CornerBlock title="Lenders" position="bl" />
-          <CornerBlock title="Tranches" position="br" />
+          <CornerBlock title="Stakers" position="br" />
 
           {/* Labels */}
           {/* Top Center Labels */}
-          <div className="absolute top-[165px] left-1/2 -translate-x-1/2 flex flex-col gap-[10px]">
-            <div className="bg-[#f0f4f0] border border-deep-green/60 px-6 py-2 text-[10px] font-bold uppercase tracking-widest text-deep-green/80">
-              Loan Request
+          <div className="absolute top-[20px] left-1/2 -translate-x-1/2 flex flex-col gap-[10px] z-30">
+            <div className="bg-[#f0f4f0] border border-deep-green/60 px-6 py-2 text-[10px] font-bold uppercase tracking-widest text-deep-green/80 text-center">
+              Trade Execution
             </div>
-            <div className="bg-[#f0f4f0] border border-deep-green/60 px-6 py-2 text-[10px] font-bold uppercase tracking-widest text-deep-green/80">
-              Credit Assessment
+            <div className="bg-[#f0f4f0] border border-deep-green/60 px-6 py-2 text-[10px] font-bold uppercase tracking-widest text-deep-green/80 text-center">
+              Governance
             </div>
           </div>
 
           {/* Left Mid Labels */}
-          <div className="absolute left-[30px] top-[285px]">
-            <AngleBox type="right">Interest Payment</AngleBox>
+          <div className="absolute left-[30px] top-[255px] z-30">
+            <AngleBox type="right">Swap Fees</AngleBox>
           </div>
 
-          <div className="absolute left-[30px] top-[425px]">
-            <AngleBox type="right">Liquidity Provision</AngleBox>
+          <div className="absolute left-[30px] top-[395px] z-30">
+            <AngleBox type="right">Lending Supply</AngleBox>
           </div>
 
           {/* Right Mid Labels */}
-          <div className="absolute right-[30px] top-[285px]">
-            <AngleBox type="left">Cycles, Rates Management</AngleBox>
+          <div className="absolute right-[30px] top-[255px] z-30">
+            <AngleBox type="left">Risk Mitigation</AngleBox>
           </div>
 
-          <div className="absolute right-[30px] top-[425px]">
-            <AngleBox type="left">Risk Diversification</AngleBox>
+          <div className="absolute right-[30px] top-[395px] z-30">
+            <AngleBox type="left">Staking Rewards</AngleBox>
           </div>
 
           {/* Bottom Center Label */}
-          <div className="absolute bottom-[20px] left-1/2 -translate-x-1/2">
-            <AngleBox type="both">Interest Earnings</AngleBox>
+          <div className="absolute bottom-[50px] left-1/2 -translate-x-1/2 z-30">
+            <AngleBox type="both">DEFI Incentives</AngleBox>
           </div>
         </div>
       </div>

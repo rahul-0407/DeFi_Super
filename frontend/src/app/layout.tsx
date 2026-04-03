@@ -9,8 +9,9 @@ import { ConditionalShell } from "@/components/layout/ConditionalShell";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "DeFi Super | All-in-One DeFi Platform",
-  description: "Swap, lend, stake, and track analytics — all from a single powerful DeFi dashboard on Ethereum.",
+  title: "Pareto | All-in-One DeFi Platform",
+  description:
+    "Swap, lend, stake, and track analytics — all from a single powerful DeFi dashboard on Ethereum.",
 };
 
 export default function RootLayout({
@@ -21,16 +22,22 @@ export default function RootLayout({
   return (
     <html lang="en" className="light">
       <head>
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
-        <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+          rel="stylesheet"
+        />
       </head>
-      <body className={`${inter.className} bg-white text-slate-900 min-h-screen overflow-x-hidden`}>
+      <body
+        className={`${inter.className} bg-white text-slate-900 min-h-screen overflow-x-hidden`}
+      >
         <AuthProvider>
           <LoadingProvider>
             <Web3Provider>
-              <ConditionalShell>
-                {children}
-              </ConditionalShell>
+              <ConditionalShell>{children}</ConditionalShell>
             </Web3Provider>
           </LoadingProvider>
         </AuthProvider>

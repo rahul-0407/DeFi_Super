@@ -7,6 +7,7 @@ import ParetoUSP from "@/components/landing/ParetoUSP";
 import ParetoWorkflowStack from "@/components/landing/ParetoWorkflowStack";
 import ParetoRoles from "@/components/landing/ParetoRoles";
 import ParetoEfficiency from "@/components/landing/ParetoEfficiency";
+import ParetoProtocolStats from "@/components/landing/ParetoProtocolStats";
 import ParetoFooter from "@/components/landing/ParetoFooter";
 
 export default function DeFiSuperLanding() {
@@ -14,11 +15,18 @@ export default function DeFiSuperLanding() {
     <main className="relative min-h-screen bg-[#f0f4f0] selection:bg-secondary-fixed/30">
       <ParetoNav />
       <div className="pt-20">
-        <ParetoHero />
-        <ParetoRoles />
-        <ParetoUSP />
-        <ParetoEfficiency />
-        <ParetoWorkflowStack />
+        <div id="product">
+          <ParetoHero />
+          <ParetoRoles />
+        </div>
+        <div id="features">
+          <ParetoUSP />
+          <ParetoEfficiency />
+          <ParetoProtocolStats />
+        </div>
+        <div id="partners">
+          <ParetoWorkflowStack />
+        </div>
       </div>
       <ParetoFooter />
     </main>
