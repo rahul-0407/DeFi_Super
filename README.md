@@ -120,12 +120,15 @@ sequenceDiagram
 | Swap Fee      | 0.3% — accrues to LP holders via k-value growth         |
 | Min Liquidity | First 1000 LP tokens permanently locked to `address(1)` |
 | Security      | `nonReentrant`, `whenNotPaused`, `SafeERC20`            |
+| Protocol Fee  | 16.6% of 0.3% swap fee (≈0.05%) to treasury             |
 
 **Key Functions:**
 
 - `addLiquidity(amount0, amount1)` → mints LP tokens
 - `removeLiquidity(shares)` → burns LP tokens, returns proportional assets
 - `swap(amount0Out, amount1Out, to)` → swaps with k-invariant check
+- `sync()` → forces reserves to match balances
+- `skim(to)` → recovers excess tokens sent to pool
 
 ---
 
@@ -133,20 +136,25 @@ sequenceDiagram
 
 **`src/DeFiLend.sol`**
 
-| Feature           | Detail                                               |
-| ----------------- | ---------------------------------------------------- |
-| Model             | Over-collateralized lending                          |
-| **Pricing**       | **Chainlink Oracle Integration (AggregatorV3)**      |
-| Threshold         | 80% LTV (Loan-to-Value)                              |
-| Liquidation Bonus | 5% — incentivizes liquidators                        |
-| Struct Packing    | `uint128` collateral + borrow in single storage slot |
-| Security          | Staleness checks (1h max), ReentrancyGuard, Pausable |
+| Feature           | Detail                                                |
+| ----------------- | ----------------------------------------------------- |
+| Model             | Over-collateralized lending                           |
+| **Pricing**       | **Chainlink Oracle Integration (AggregatorV3)**       |
+| Threshold         | 80% LTV (Loan-to-Value)                               |
+| Liquidation Bonus | 5% — incentivizes liquidators                         |
+| Close Factor      | 50% — max per liquidation transaction                 |
+| Interest Model    | Linear Utilization-based (2% base + 10% slope)        |
+| Receipt Tokens    | `d[ASSET]` (e.g., dUSDC) represents pool share        |
+| Struct Packing    | `uint128` collateral + borrow in single storage slot  |
+| Security          | Staleness checks (48h max), ReentrancyGuard, Pausable |
 
 **Key Functions:**
 
 - `deposit(amount)` — deposit collateral (emits `PositionUpdated`)
 - `borrow(amount)` — borrow against collateral (emits `PositionUpdated`)
 - `repay(amount)` — repay debt (emits `PositionUpdated`)
+- `supplyBorrowToken(amount)` — supply liquidity to earn interest
+- `withdrawLiquidity(amount)` — withdraw supplied liquidity
 - `liquidate(user, amount)` — execute liquidation via oracle prices (emits `LiquidationExecuted`)
 
 ---
@@ -155,12 +163,10 @@ sequenceDiagram
 
 **`src/DeFiStaking.sol`**
 
-| Feature      | Detail                                       |
-| ------------ | -------------------------------------------- |
-| Model        | Reward-per-token cumulative distribution     |
-| Default Rate | 1 token/second                               |
-| Admin        | Owner can adjust `rewardRate`                |
-| Security     | `nonReentrant`, `whenNotPaused`, `SafeERC20` |
+| Model | Reward-per-token cumulative distribution |
+| Default Rate | 1 token/second |
+| Yield Looping| Staked assets supplied to Lending Pool |
+| Security | `nonReentrant`, `whenNotPaused`, `SafeERC20` |
 
 **Key Functions:**
 
@@ -197,6 +203,38 @@ sequenceDiagram
 - Handles token approvals and transfers for AMM operations
 - Deadline parameter for front-running protection
 - Slippage protection on swaps (`amountOutMin`)
+
+---
+
+## 📍 Deployed Addresses (Sepolia)
+
+The protocol is currently live on the Sepolia Testnet with the following infrastructure:
+
+### Core Contracts
+
+| Contract          | Address                                      |
+| ----------------- | -------------------------------------------- |
+| **DeFiAMM**       | `0x9bf904562e141c0bfb04d8b70e1c67b43afd403b` |
+| **DeFiRouter**    | `0x89e46db557b013a75e788d5faadfb600f89b569c` |
+| **DeFiLend**      | `0xde139c3d98c93bd06a074692ca171b8744742712` |
+| **DeFiStaking**   | `0x618d4c16fb2d34101c32968f90986ad6f5e23caf` |
+| **DeFiFlashLoan** | `0xded027a033a1106d7a85de74afe54e628faa4d39` |
+
+### Protocol Tokens
+
+| Token            | Symbol  | Address                                      |
+| ---------------- | ------- | -------------------------------------------- |
+| **DeFi Token**   | `DEFI`  | `0xd672dccec15daf786238d11c22c1fa3f77f2b287` |
+| **Receipt USDC** | `dUSDC` | `0x835e2ca78249f36345cf8d5d487dc3fa03aaded6` |
+| **WETH**         | `WETH`  | `0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14` |
+| **USDC**         | `USDC`  | `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238` |
+
+### External Infrastructure
+
+| Resource       | Name / Detail | Address                                      |
+| -------------- | ------------- | -------------------------------------------- |
+| **Price Feed** | `ETH / USD`   | `0x694AA1769357215DE4FAC081bf1f309aDC325306` |
+| **LP Pool**    | `WETH / USDC` | `0x9bf904562e141c0bfb04d8b70e1c67b43afd403b` |
 
 ---
 
